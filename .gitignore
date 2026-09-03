@@ -44,4 +44,12 @@ app-example
 /ios
 /android
 
+# editor / local tooling (no van al repo)
+.vscode/
+.claude/
+
+# instrucciones de agentes IA (solo local)
+AGENTS.md
+CLAUDE.md
+
 /docs
