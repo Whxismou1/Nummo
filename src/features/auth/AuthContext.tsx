@@ -334,8 +334,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         let mounted = true;
 
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
             if (!mounted) return;
+            if (error) {
+                console.warn("[AuthContext] getSession error:", error.message);
+                if (
+                    error.message?.includes("Refresh Token Not Found") ||
+                    error.message?.includes("Invalid Refresh Token") ||
+                    error.message?.includes("token is expired")
+                ) {
+                    setUser(null);
+                    conn.runSync("DELETE FROM app_session WHERE key = 'active_user'");
+                }
+                return;
+            }
             if (session?.user) {
                 const cloudProfile: UserProfile = {
                     id: session.user.id,
@@ -351,6 +363,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser(cloudProfile);
                 void syncAll(cloudProfile.id);
             }
+        }).catch((err) => {
+            console.warn("[AuthContext] getSession unexpected failure:", err);
         });
 
         const {

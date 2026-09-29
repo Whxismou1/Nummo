@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_PROJECT_URL || "";
 const supabaseAnonKey =
@@ -9,32 +9,45 @@ const supabaseAnonKey =
     "";
 
 const ExpoSecureStoreAdapter = {
-    getItem: (key: string): Promise<string | null> => {
+    getItem: async (key: string): Promise<string | null> => {
         if (Platform.OS === "web") {
             if (typeof localStorage !== "undefined") {
-                return Promise.resolve(localStorage.getItem(key));
+                return localStorage.getItem(key);
             }
-            return Promise.resolve(null);
+            return null;
         }
-        return SecureStore.getItemAsync(key);
+        try {
+            return await SecureStore.getItemAsync(key);
+        } catch (e) {
+            console.warn("[SecureStore] getItem error:", e);
+            return null;
+        }
     },
-    setItem: (key: string, value: string): Promise<void> => {
+    setItem: async (key: string, value: string): Promise<void> => {
         if (Platform.OS === "web") {
             if (typeof localStorage !== "undefined") {
                 localStorage.setItem(key, value);
             }
-            return Promise.resolve();
+            return;
         }
-        return SecureStore.setItemAsync(key, value);
+        try {
+            await SecureStore.setItemAsync(key, value);
+        } catch (e) {
+            console.warn("[SecureStore] setItem error:", e);
+        }
     },
-    removeItem: (key: string): Promise<void> => {
+    removeItem: async (key: string): Promise<void> => {
         if (Platform.OS === "web") {
             if (typeof localStorage !== "undefined") {
                 localStorage.removeItem(key);
             }
-            return Promise.resolve();
+            return;
         }
-        return SecureStore.deleteItemAsync(key);
+        try {
+            await SecureStore.deleteItemAsync(key);
+        } catch (e) {
+            console.warn("[SecureStore] removeItem error:", e);
+        }
     },
 };
 
@@ -46,6 +59,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: false,
     },
 });
+
+// React Native halts JS timers in background; startAutoRefresh on foreground keeps refresh tokens alive seamlessly
+if (Platform.OS !== "web") {
+    AppState.addEventListener("change", (state) => {
+        if (state === "active") {
+            supabase.auth.startAutoRefresh();
+        } else {
+            supabase.auth.stopAutoRefresh();
+        }
+    });
+}
 
 export const isSupabaseConfigured = (): boolean => {
     return Boolean(

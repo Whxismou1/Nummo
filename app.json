@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nummo",
     "slug": "nummo",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nummo",
@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.whxismou1.nummo",
+      "versionCode": 2,
       "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#1E1B4B",

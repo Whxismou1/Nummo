@@ -63,6 +63,16 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Determine Release Tag
+        id: release_info
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+            echo "tag=v1.0.1-${TIMESTAMP}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build Android APK with EAS
         id: eas_build
         run: |
@@ -85,22 +95,13 @@ jobs:
             }
           ")
           echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
+          TAG="${{ steps.release_info.outputs.tag }}"
           if [ -n "$APK_URL" ]; then
-            echo "Downloading APK from: $APK_URL"
-            curl -L -o ./Nummo-v1.0.0.apk "$APK_URL"
-            ls -la ./Nummo-v1.0.0.apk
+            echo "Downloading APK to Nummo-${TAG}.apk from: $APK_URL"
+            curl -L -o "./Nummo-${TAG}.apk" "$APK_URL"
+            ls -la ./Nummo-*.apk
           else
             echo "No direct APK binary URL found in build.json output"
-          fi
-
-      - name: Determine Release Tag
-        id: release_info
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          else
-            TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
-            echo "tag=v1.0.0-${TIMESTAMP}" >> $GITHUB_OUTPUT
           fi
 
       - name: Create GitHub Release & Upload APK
@@ -116,7 +117,7 @@ jobs:
             - ✅ Sincronización en la nube con Supabase y Google Sign-In
             
             Descarga el archivo APK adjunto para instalar Nummo en tu dispositivo Android.
-          files: ./Nummo-v1.0.0.apk
+          files: ./Nummo-*.apk
           fail_on_unmatched_files: false
           draft: false
           prerelease: false
