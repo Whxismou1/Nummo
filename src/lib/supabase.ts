@@ -2,11 +2,14 @@ import { createClient } from "@supabase/supabase-js";
 import * as SecureStore from "expo-secure-store";
 import { AppState, Platform } from "react-native";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_PROJECT_URL || "";
+const DEFAULT_SUPABASE_URL = "https://wbvfmnytnsmcghmfvepc.supabase.co";
+const DEFAULT_SUPABASE_KEY = "sb_publishable_6UmEjoSZvNx3ErD-tM1-CQ_sGI-2X29";
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_PROJECT_URL || DEFAULT_SUPABASE_URL;
 const supabaseAnonKey =
     process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_URL ||
     process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    "";
+    DEFAULT_SUPABASE_KEY;
 
 const ExpoSecureStoreAdapter = {
     getItem: async (key: string): Promise<string | null> => {
@@ -62,13 +65,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 // React Native halts JS timers in background; startAutoRefresh on foreground keeps refresh tokens alive seamlessly
 if (Platform.OS !== "web") {
-    AppState.addEventListener("change", (state) => {
-        if (state === "active") {
-            supabase.auth.startAutoRefresh();
-        } else {
-            supabase.auth.stopAutoRefresh();
-        }
-    });
+    try {
+        AppState.addEventListener("change", (state) => {
+            try {
+                if (state === "active") {
+                    supabase.auth.startAutoRefresh();
+                } else {
+                    supabase.auth.stopAutoRefresh();
+                }
+            } catch (err) {
+                console.warn("[Supabase] autoRefresh error:", err);
+            }
+        });
+    } catch (err) {
+        console.warn("[Supabase] AppState listener error:", err);
+    }
 }
 
 export const isSupabaseConfigured = (): boolean => {

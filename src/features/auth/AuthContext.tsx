@@ -44,7 +44,8 @@ if (hasNativeGoogleSignin()) {
         const gModule = require("@react-native-google-signin/google-signin");
         GoogleSignin = gModule.GoogleSignin;
         statusCodes = gModule.statusCodes;
-        const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "";
+        const DEFAULT_GOOGLE_WEB_CLIENT_ID = "1089752702487-55ekq1ol4mu6kc0nveo8pk58uktumm12.apps.googleusercontent.com";
+        const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || DEFAULT_GOOGLE_WEB_CLIENT_ID;
         GoogleSignin.configure({
             webClientId: webClientId || undefined,
             scopes: ["profile", "email"],

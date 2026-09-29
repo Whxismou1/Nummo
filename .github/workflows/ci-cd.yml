@@ -48,6 +48,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Create .env file for build
+        run: |
+          cat << 'EOF' > .env
+          EXPO_PUBLIC_SUPABASE_PROJECT_URL=https://wbvfmnytnsmcghmfvepc.supabase.co
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_URL=sb_publishable_6UmEjoSZvNx3ErD-tM1-CQ_sGI-2X29
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=1089752702487-55ekq1ol4mu6kc0nveo8pk58uktumm12.apps.googleusercontent.com
+          EOF
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -70,7 +78,7 @@ jobs:
             echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           else
             TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
-            echo "tag=v1.0.1-${TIMESTAMP}" >> $GITHUB_OUTPUT
+            echo "tag=v1.0.2-${TIMESTAMP}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Android APK with EAS
