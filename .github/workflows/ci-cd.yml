@@ -64,8 +64,34 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Build Android APK with EAS
+        id: eas_build
         run: |
-          eas build --platform android --profile production --non-interactive --wait --output=./Nummo-v1.0.0.apk
+          eas build --platform android --profile production --non-interactive --wait --json > build.json
+          cat build.json
+          APK_URL=$(node -e "
+            const fs = require('fs');
+            try {
+              const raw = fs.readFileSync('./build.json', 'utf8');
+              const jsonStart = raw.indexOf('{');
+              const jsonArrayStart = raw.indexOf('[');
+              const startIdx = (jsonArrayStart !== -1 && (jsonStart === -1 || jsonArrayStart < jsonStart)) ? jsonArrayStart : jsonStart;
+              const jsonStr = raw.substring(startIdx);
+              const data = JSON.parse(jsonStr);
+              const item = Array.isArray(data) ? data[0] : data;
+              const url = item?.artifacts?.applicationArchiveUrl || item?.artifacts?.buildUrl || '';
+              console.log(url);
+            } catch (e) {
+              console.error(e);
+            }
+          ")
+          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
+          if [ -n "$APK_URL" ]; then
+            echo "Downloading APK from: $APK_URL"
+            curl -L -o ./Nummo-v1.0.0.apk "$APK_URL"
+            ls -la ./Nummo-v1.0.0.apk
+          else
+            echo "No direct APK binary URL found in build.json output"
+          fi
 
       - name: Determine Release Tag
         id: release_info
@@ -91,6 +117,7 @@ jobs:
             
             Descarga el archivo APK adjunto para instalar Nummo en tu dispositivo Android.
           files: ./Nummo-v1.0.0.apk
+          fail_on_unmatched_files: false
           draft: false
           prerelease: false
         env:
