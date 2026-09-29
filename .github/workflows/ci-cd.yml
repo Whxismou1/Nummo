@@ -78,7 +78,7 @@ jobs:
             echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           else
             TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
-            echo "tag=v1.0.2-${TIMESTAMP}" >> $GITHUB_OUTPUT
+            echo "tag=v1.0.3-${TIMESTAMP}" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Android APK with EAS

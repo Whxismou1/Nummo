@@ -22,11 +22,9 @@ import {
     FirstDayOfWeek,
     useAppSettings,
 } from "@/features/settings/SettingsContext";
-import { getAllTransactionsForExport } from "@/features/transactions/repository";
 import { useAuth } from "@/features/auth/AuthContext";
 import { formatDate } from "@/lib/date";
-import * as FileSystem from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
+import { sendComprehensiveFinancialReport } from "@/services/notifications";
 
 export default function SettingsScreen() {
     const { colors: c, themeMode, setThemeMode } = useTheme();
@@ -38,9 +36,13 @@ export default function SettingsScreen() {
         currencySymbol,
         firstDayOfWeek,
         hideBalances,
+        notificationsApp,
+        notificationsEmail,
         setCurrency,
         setFirstDayOfWeek,
         setHideBalances,
+        setNotificationsApp,
+        setNotificationsEmail,
     } = useAppSettings();
 
     const {
@@ -130,109 +132,32 @@ export default function SettingsScreen() {
         );
     };
 
-    const handleExportData = () => {
-        Alert.alert(
-            "Exportar datos",
-            "Elige el formato de descarga para compartir o guardar tus movimientos:",
-            [
-                {
-                    text: "CSV (Excel)",
-                    onPress: () => exportFile("csv"),
-                },
-                {
-                    text: "JSON",
-                    onPress: () => exportFile("json"),
-                },
-                { text: "Cancelar", style: "cancel" },
-            ]
-        );
-    };
+    const handleSendFinancialReport = async () => {
+        if (!user?.email) {
+            Alert.alert(
+                "Cuenta requerida",
+                "Debes iniciar sesión con tu cuenta de correo o Google para recibir tu informe financiero."
+            );
+            return;
+        }
 
-    const exportFile = async (format: "csv" | "json") => {
         try {
             setExporting(true);
-            const txs = await getAllTransactionsForExport();
-
-            if (txs.length === 0) {
+            const res = await sendComprehensiveFinancialReport(user.email);
+            if (res.ok) {
                 Alert.alert(
-                    "Sin datos",
-                    "Aún no tienes movimientos registrados para exportar."
+                    "¡Informe enviado!",
+                    `Hemos enviado a ${user.email} un informe completo con tus ingresos, gastos, desglose de sobres, huchas y últimos movimientos.`
                 );
-                return;
-            }
-
-            const timestamp = new Date().toISOString().slice(0, 10);
-
-            if (format === "csv") {
-                const sanitizeCsv = (val: string): string => {
-                    let clean = val.replace(/;/g, ",").replace(/\n/g, " ");
-                    // Neutralize spreadsheet formula injection (CWE-1236)
-                    if (/^[=+\-@|\t]/.test(clean)) {
-                        clean = `'${clean}`;
-                    }
-                    return clean;
-                };
-
-                // Header with UTF-8 BOM so Excel opens it with proper accents and characters
-                let csv = "\uFEFFFecha;Tipo;Categoría;Importe;Nota\n";
-                for (const tx of txs) {
-                    const dateStr = formatDate(tx.date);
-                    const typeStr = tx.type === "expense" ? "Gasto" : "Ingreso";
-                    const catStr = sanitizeCsv(tx.category?.name || "Sin categoría");
-                    const amountStr = (tx.amount / 100).toFixed(2).replace(".", ",");
-                    const noteStr = sanitizeCsv(tx.note || "");
-                    csv += `${dateStr};${typeStr};${catStr};${amountStr};${noteStr}\n`;
-                }
-
-                const fileUri = `${FileSystem.cacheDirectory}nummo_movimientos_${timestamp}.csv`;
-                await FileSystem.writeAsStringAsync(fileUri, csv, {
-                    encoding: FileSystem.EncodingType.UTF8,
-                });
-
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(fileUri, {
-                        mimeType: "text/csv",
-                        dialogTitle: "Descargar movimientos (CSV)",
-                        UTI: "public.comma-separated-values-text",
-                    });
-                } else {
-                    await Share.share({
-                        title: "Nummo - Exportación de movimientos (CSV)",
-                        message: csv,
-                    });
-                }
             } else {
-                // Clean user-friendly JSON without raw IDs and timestamps
-                const cleanList = txs.map((tx) => ({
-                    fecha: formatDate(tx.date),
-                    tipo: tx.type === "expense" ? "Gasto" : "Ingreso",
-                    categoria: tx.category?.name || "Sin categoría",
-                    importe: Number((tx.amount / 100).toFixed(2)),
-                    nota: tx.note || "",
-                }));
-
-                const jsonContent = JSON.stringify(cleanList, null, 2);
-                const fileUri = `${FileSystem.cacheDirectory}nummo_movimientos_${timestamp}.json`;
-                await FileSystem.writeAsStringAsync(fileUri, jsonContent, {
-                    encoding: FileSystem.EncodingType.UTF8,
-                });
-
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(fileUri, {
-                        mimeType: "application/json",
-                        dialogTitle: "Descargar movimientos (JSON)",
-                        UTI: "public.json",
-                    });
-                } else {
-                    await Share.share({
-                        title: "Nummo - Exportación de movimientos (JSON)",
-                        message: jsonContent,
-                    });
-                }
+                Alert.alert(
+                    "Informe generado",
+                    `Se ha procesado tu solicitud para ${user.email}. Si has desplegado la Edge Function 'send-email' en Supabase, revisa tu bandeja de entrada o spam.`
+                );
             }
-        } catch (e) {
-            console.error("Error exporting data:", e);
-            Alert.alert("Error", "No se pudo exportar el archivo.");
+        } catch (e: any) {
+            console.error("Error sending financial report:", e);
+            Alert.alert("Error", e?.message || "No se pudo enviar el informe por correo.");
         } finally {
             setExporting(false);
         }
@@ -551,10 +476,10 @@ export default function SettingsScreen() {
                         DATOS Y PRIVACIDAD
                     </Text>
                     <View style={[styles.cardGroup, { backgroundColor: c.surface, borderColor: c.border }]}>
-                        {/* Export */}
+                        {/* Enviar informe financiero por correo */}
                         <Pressable
                             style={styles.cardItem}
-                            onPress={handleExportData}
+                            onPress={handleSendFinancialReport}
                             disabled={exporting}
                         >
                             <View style={styles.itemLeft}>
@@ -562,17 +487,21 @@ export default function SettingsScreen() {
                                     {exporting ? (
                                         <ActivityIndicator size="small" color={c.primary} />
                                     ) : (
-                                        <Ionicons name="download-outline" size={18} color={c.primary} />
+                                        <Ionicons name="mail-unread-outline" size={18} color={c.primary} />
                                     )}
                                 </View>
-                                <View>
-                                    <Text style={[styles.itemTitle, { color: c.text }]}>Exportar datos</Text>
+                                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                                    <Text style={[styles.itemTitle, { color: c.text }]}>
+                                        Enviar informe financiero al correo
+                                    </Text>
                                     <Text style={[styles.itemSub, { color: c.textMuted }]}>
-                                        Descargar tus movimientos en CSV o JSON
+                                        {user?.email
+                                            ? `Recibe tus balances, presupuestos y gastos en ${user.email}`
+                                            : "Recibe un desglose visual y detallado en tu email"}
                                     </Text>
                                 </View>
                             </View>
-                            <Ionicons name="share-outline" size={18} color={c.textMuted} />
+                            <Ionicons name="paper-plane-outline" size={18} color={c.primary} />
                         </Pressable>
 
                         <View style={[styles.divider, { backgroundColor: c.border }]} />
@@ -600,7 +529,80 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 6. Seguridad ─────────────────────────────────────── */}
+                {/* ── 6. Notificaciones & Alertas ──────────────────────── */}
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
+                        NOTIFICACIONES Y ALERTAS
+                    </Text>
+                    <View style={[styles.cardGroup, { backgroundColor: c.surface, borderColor: c.border }]}>
+                        {/* Notificaciones App */}
+                        <View style={styles.cardItem}>
+                            <View style={styles.itemLeft}>
+                                <View style={[styles.itemIconBox, { backgroundColor: c.track }]}>
+                                    <Ionicons name="notifications-outline" size={18} color={c.primary} />
+                                </View>
+                                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                                    <Text style={[styles.itemTitle, { color: c.text }]}>
+                                        Notificaciones en la app
+                                    </Text>
+                                    <Text style={[styles.itemSub, { color: c.textMuted }]}>
+                                        Avisos de presupuestos y metas en la pantalla de inicio
+                                    </Text>
+                                </View>
+                            </View>
+                            <Switch
+                                value={notificationsApp}
+                                onValueChange={setNotificationsApp}
+                                trackColor={{ false: c.track, true: c.primary }}
+                                thumbColor="#FFFFFF"
+                            />
+                        </View>
+
+                        <View style={[styles.divider, { backgroundColor: c.border }]} />
+
+                        {/* Alertas por Correo */}
+                        <View style={styles.cardItem}>
+                            <View style={styles.itemLeft}>
+                                <View style={[styles.itemIconBox, { backgroundColor: c.track }]}>
+                                    <Ionicons name="mail-outline" size={18} color={c.primary} />
+                                </View>
+                                <View style={{ flex: 1, paddingRight: spacing.sm }}>
+                                    <Text style={[styles.itemTitle, { color: c.text }]}>
+                                        Alertas por correo electrónico
+                                    </Text>
+                                    <Text style={[styles.itemSub, { color: c.textMuted }]}>
+                                        {user?.email
+                                            ? `Enviar resúmenes y avisos a ${user.email}`
+                                            : "Requiere iniciar sesión con tu cuenta"}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Switch
+                                value={notificationsEmail}
+                                onValueChange={(val) => {
+                                    if (val && !user?.email) {
+                                        Alert.alert(
+                                            "Cuenta requerida",
+                                            "Inicia sesión con tu cuenta de correo o Google para poder recibir alertas en tu email."
+                                        );
+                                        return;
+                                    }
+                                    setNotificationsEmail(val);
+                                    if (val) {
+                                        Alert.alert(
+                                            "Alertas por correo activadas",
+                                            `Recibirás los resúmenes y alertas críticas de tus finanzas en ${user?.email}.`
+                                        );
+                                    }
+                                }}
+                                trackColor={{ false: c.track, true: c.primary }}
+                                thumbColor="#FFFFFF"
+                            />
+                        </View>
+                    </View>
+                </View>
+
+                {/* ── 7. Seguridad ─────────────────────────────────────── */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
                         SEGURIDAD

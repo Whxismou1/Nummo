@@ -20,10 +20,11 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle } from "react-native-svg";
 import { useAppSettings } from "@/features/settings/SettingsContext";
 import { useAuth } from "@/features/auth/AuthContext";
+import { NotificationsModal } from "@/components/NotificationsModal";
 
 export default function DashboardScreen() {
     const { colors: c, isDark, toggleTheme } = useTheme();
-    const { hideBalances, currency, currencySymbol } = useAppSettings();
+    const { hideBalances, currency, currencySymbol, notificationsApp, notificationsEmail } = useAppSettings();
     const { user, isAuthenticated } = useAuth();
 
     if (!isAuthenticated) {
@@ -33,6 +34,7 @@ export default function DashboardScreen() {
     const router = useRouter();
 
     const [showBalances, setShowBalances] = useState(!hideBalances);
+    const [notificationsVisible, setNotificationsVisible] = useState(false);
 
     useEffect(() => {
         setShowBalances(!hideBalances);
@@ -77,6 +79,11 @@ export default function DashboardScreen() {
         : 0;
     const strokeDashoffset = circumference - (circumference * goalPct) / 100;
 
+    const activeAlertsCount =
+        (data?.topBudgets?.filter((b) => b.status === "over" || b.status === "warn")?.length ?? 0) +
+        (data?.availableBalance && data.availableBalance < 0 ? 1 : 0) +
+        (data?.featuredGoal?.isCompleted ? 1 : 0);
+
     return (
         <View style={[styles.screen, { backgroundColor: c.background }]}>
             <ScrollView
@@ -111,13 +118,7 @@ export default function DashboardScreen() {
                                     position: "relative",
                                 },
                             ]}
-                            onPress={() => {
-                                Alert.alert(
-                                    "Avisos y Alertas",
-                                    `• Presupuesto Alimentación: Has superado el límite mensual en +30,00 ${currencySymbol}.\n• Hucha Fondo de Emergencia: ¡Estás al 85% de tu meta!`,
-                                    [{ text: "Entendido" }]
-                                );
-                            }}
+                            onPress={() => setNotificationsVisible(true)}
                             hitSlop={8}
                         >
                             <Ionicons
@@ -125,17 +126,19 @@ export default function DashboardScreen() {
                                 size={19}
                                 color={c.text}
                             />
-                            <View
-                                style={{
-                                    position: "absolute",
-                                    top: 8,
-                                    right: 8,
-                                    width: 7,
-                                    height: 7,
-                                    borderRadius: 4,
-                                    backgroundColor: c.danger,
-                                }}
-                            />
+                            {notificationsApp && activeAlertsCount > 0 && (
+                                <View
+                                    style={{
+                                        position: "absolute",
+                                        top: 8,
+                                        right: 8,
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 4,
+                                        backgroundColor: c.danger,
+                                    }}
+                                />
+                            )}
                         </Pressable>
 
                         {/* Avatar */}
@@ -699,6 +702,15 @@ export default function DashboardScreen() {
                     </Pressable>
                 )}
             </ScrollView>
+
+            <NotificationsModal
+                visible={notificationsVisible}
+                onClose={() => setNotificationsVisible(false)}
+                data={data}
+                notificationsApp={notificationsApp}
+                notificationsEmail={notificationsEmail}
+                userEmail={user?.email}
+            />
         </View>
     );
 }

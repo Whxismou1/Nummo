@@ -14,16 +14,16 @@ import { spacing } from "@/theme/spacing";
 import { NummoLogo } from "@/components/NummoLogo";
 
 export function AppLockOverlay() {
-    const { isLocked, unlockApp, biometricTypeLabel } = useAuth();
+    const { isLocked, user, unlockApp, biometricTypeLabel } = useAuth();
     const { colors: c } = useTheme();
 
     useEffect(() => {
-        if (isLocked) {
+        if (isLocked && user) {
             void unlockApp();
         }
-    }, [isLocked, unlockApp]);
+    }, [isLocked, user, unlockApp]);
 
-    if (!isLocked) return null;
+    if (!isLocked || !user) return null;
 
     const iconName =
         biometricTypeLabel === "Face ID"

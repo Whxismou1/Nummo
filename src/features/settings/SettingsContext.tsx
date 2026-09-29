@@ -9,12 +9,16 @@ export interface AppSettings {
     currency: CurrencyCode;
     firstDayOfWeek: FirstDayOfWeek;
     hideBalances: boolean;
+    notificationsApp: boolean;
+    notificationsEmail: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
     currency: "EUR",
     firstDayOfWeek: "monday",
     hideBalances: false,
+    notificationsApp: true,
+    notificationsEmail: false,
 };
 
 export const CURRENCY_CONFIG: Record<CurrencyCode, { name: string; symbol: string; locale: string }> = {
@@ -42,7 +46,7 @@ export function getAppSetting<K extends keyof AppSettings>(key: K): AppSettings[
             [key]
         );
         if (!row) return DEFAULT_SETTINGS[key];
-        if (key === "hideBalances") {
+        if (key === "hideBalances" || key === "notificationsApp" || key === "notificationsEmail") {
             return (row.value === "true") as AppSettings[K];
         }
         return row.value as AppSettings[K];
@@ -68,10 +72,14 @@ interface SettingsContextValue {
     currencySymbol: string;
     firstDayOfWeek: FirstDayOfWeek;
     hideBalances: boolean;
+    notificationsApp: boolean;
+    notificationsEmail: boolean;
     setCurrency: (currency: CurrencyCode) => void;
     setFirstDayOfWeek: (day: FirstDayOfWeek) => void;
     setHideBalances: (hide: boolean) => void;
     toggleHideBalances: () => void;
+    setNotificationsApp: (enabled: boolean) => void;
+    setNotificationsEmail: (enabled: boolean) => void;
 }
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
@@ -84,6 +92,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             currency: initialCurrency,
             firstDayOfWeek: getAppSetting("firstDayOfWeek"),
             hideBalances: getAppSetting("hideBalances"),
+            notificationsApp: getAppSetting("notificationsApp"),
+            notificationsEmail: getAppSetting("notificationsEmail"),
         };
     });
 
@@ -107,10 +117,14 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         currencySymbol,
         firstDayOfWeek: settings.firstDayOfWeek,
         hideBalances: settings.hideBalances,
+        notificationsApp: settings.notificationsApp,
+        notificationsEmail: settings.notificationsEmail,
         setCurrency: (c) => updateSetting("currency", c),
         setFirstDayOfWeek: (d) => updateSetting("firstDayOfWeek", d),
         setHideBalances: (h) => updateSetting("hideBalances", h),
         toggleHideBalances: () => updateSetting("hideBalances", !settings.hideBalances),
+        setNotificationsApp: (enabled) => updateSetting("notificationsApp", enabled),
+        setNotificationsEmail: (enabled) => updateSetting("notificationsEmail", enabled),
     };
 
     return (
@@ -126,12 +140,16 @@ export function useAppSettings() {
         // Fallback for isolated tests or unmounted context
         const currency = getAppSetting("currency");
         const hideBalances = getAppSetting("hideBalances");
+        const notificationsApp = getAppSetting("notificationsApp");
+        const notificationsEmail = getAppSetting("notificationsEmail");
         return {
             settings: DEFAULT_SETTINGS,
             currency,
             currencySymbol: CURRENCY_CONFIG[currency]?.symbol ?? "€",
             firstDayOfWeek: getAppSetting("firstDayOfWeek"),
             hideBalances,
+            notificationsApp,
+            notificationsEmail,
             setCurrency: (c: CurrencyCode) => {
                 setAppSetting("currency", c);
                 setActiveCurrency(c);
@@ -139,6 +157,8 @@ export function useAppSettings() {
             setFirstDayOfWeek: (d: FirstDayOfWeek) => setAppSetting("firstDayOfWeek", d),
             setHideBalances: (h: boolean) => setAppSetting("hideBalances", h),
             toggleHideBalances: () => setAppSetting("hideBalances", !hideBalances),
+            setNotificationsApp: (enabled: boolean) => setAppSetting("notificationsApp", enabled),
+            setNotificationsEmail: (enabled: boolean) => setAppSetting("notificationsEmail", enabled),
         };
     }
     return ctx;

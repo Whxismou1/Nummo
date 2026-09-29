@@ -2,7 +2,9 @@ import {
     addContribution,
     deleteGoal,
     getGoalByIdWithProgress,
+    getGoalsWithProgress,
     getGoalTransactions,
+    transferBetweenGoals,
     type GoalProgress,
 } from "@/features/goals/repository";
 import { useAppSettings } from "@/features/settings/SettingsContext";
@@ -21,6 +23,7 @@ import {
     FlatList,
     Modal,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -35,12 +38,14 @@ export default function GoalDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
 
     const [goal, setGoal] = useState<GoalProgress | null>(null);
+    const [otherGoals, setOtherGoals] = useState<GoalProgress[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Modal state for contribution / withdrawal
+    // Modal state for contribution / withdrawal / transfer
     const [actionModalVisible, setActionModalVisible] = useState(false);
-    const [actionType, setActionType] = useState<"deposit" | "withdraw">("deposit");
+    const [actionType, setActionType] = useState<"deposit" | "withdraw" | "transfer">("deposit");
+    const [targetGoalId, setTargetGoalId] = useState<string | null>(null);
     const [amountText, setAmountText] = useState("");
     const [noteText, setNoteText] = useState("");
     const [actionSubmitting, setActionSubmitting] = useState(false);
@@ -48,9 +53,10 @@ export default function GoalDetailScreen() {
     const loadData = useCallback(async () => {
         if (!id) return;
         try {
-            const [g, txs] = await Promise.all([
+            const [g, txs, allG] = await Promise.all([
                 getGoalByIdWithProgress(id),
                 getGoalTransactions(id),
+                getGoalsWithProgress(),
             ]);
             if (!g) {
                 Alert.alert("Error", "Hucha no encontrada.");
@@ -59,6 +65,11 @@ export default function GoalDetailScreen() {
             }
             setGoal(g);
             setTransactions(txs);
+            const others = allG.filter((item) => item.id !== id);
+            setOtherGoals(others);
+            if (others.length > 0) {
+                setTargetGoalId(others[0].id);
+            }
         } catch {
             Alert.alert("Error", "No se pudo cargar la hucha.");
         } finally {
@@ -72,7 +83,32 @@ export default function GoalDetailScreen() {
         }, [loadData]),
     );
 
-    const handleOpenAction = (type: "deposit" | "withdraw") => {
+    const handleOpenAction = (type: "deposit" | "withdraw" | "transfer") => {
+        const available = goal?.savedAmount ?? 0;
+        if (type === "withdraw" && available <= 0) {
+            Alert.alert(
+                "Sin saldo para retirar",
+                "Esta hucha no tiene fondos acumulados actualmente para poder realizar una retirada."
+            );
+            return;
+        }
+        if (type === "transfer") {
+            if (available <= 0) {
+                Alert.alert(
+                    "Sin saldo para transferir",
+                    "Esta hucha no tiene fondos acumulados actualmente para transferir a otra."
+                );
+                return;
+            }
+            if (otherGoals.length === 0) {
+                Alert.alert(
+                    "No hay otras huchas",
+                    "Crea al menos otra hucha de ahorro antes de poder mover dinero entre ellas."
+                );
+                return;
+            }
+        }
+
         setActionType(type);
         setAmountText("");
         setNoteText("");
@@ -82,19 +118,57 @@ export default function GoalDetailScreen() {
     const handleConfirmAction = async () => {
         if (!id || !amountText.trim()) return;
 
+        const cents = toCents(amountText);
+        if (cents <= 0) {
+            Alert.alert("Importe inválido", "Por favor introduce un importe mayor que cero.");
+            return;
+        }
+
+        const available = goal?.savedAmount ?? 0;
+
+        if (actionType === "withdraw" && cents > available) {
+            Alert.alert(
+                "Saldo insuficiente",
+                `No puedes retirar más de lo ahorrado en esta hucha (${formatMoney(available)}).`
+            );
+            return;
+        }
+
+        if (actionType === "transfer") {
+            if (!targetGoalId) {
+                Alert.alert("Hucha de destino", "Selecciona una hucha para transferir el dinero.");
+                return;
+            }
+            if (cents > available) {
+                Alert.alert(
+                    "Saldo insuficiente",
+                    `No puedes transferir más de lo ahorrado en esta hucha (${formatMoney(available)}).`
+                );
+                return;
+            }
+        }
+
         try {
             setActionSubmitting(true);
-            const cents = toCents(amountText);
-            await addContribution({
-                goalId: id,
-                amount: cents,
-                note: noteText.trim() || undefined,
-                isWithdrawal: actionType === "withdraw",
-            });
+            if (actionType === "transfer") {
+                await transferBetweenGoals({
+                    fromGoalId: id,
+                    toGoalId: targetGoalId!,
+                    amount: cents,
+                    note: noteText.trim() || undefined,
+                });
+            } else {
+                await addContribution({
+                    goalId: id,
+                    amount: cents,
+                    note: noteText.trim() || undefined,
+                    isWithdrawal: actionType === "withdraw",
+                });
+            }
             setActionModalVisible(false);
             await loadData();
-        } catch {
-            Alert.alert("Error", "No se pudo registrar la operación.");
+        } catch (e: any) {
+            Alert.alert("Error", e?.message || "No se pudo registrar la operación.");
         } finally {
             setActionSubmitting(false);
         }
@@ -234,7 +308,7 @@ export default function GoalDetailScreen() {
                     </View>
                 )}
 
-                {/* Action buttons (Aportar / Retirar) */}
+                {/* Action buttons (Aportar / Retirar / Mover) */}
                 <View style={styles.actionRow}>
                     <Pressable
                         style={[styles.actionBtn, { backgroundColor: c.primary }]}
@@ -242,11 +316,11 @@ export default function GoalDetailScreen() {
                     >
                         <Ionicons
                             name="arrow-down-circle"
-                            size={18}
+                            size={16}
                             color={c.primaryText}
                         />
                         <Text style={[styles.actionBtnText, { color: c.primaryText }]}>
-                            Aportar dinero
+                            Aportar
                         </Text>
                     </Pressable>
 
@@ -260,11 +334,29 @@ export default function GoalDetailScreen() {
                     >
                         <Ionicons
                             name="arrow-up-circle-outline"
-                            size={18}
+                            size={16}
                             color={c.text}
                         />
                         <Text style={[styles.actionBtnText, { color: c.text }]}>
                             Retirar
+                        </Text>
+                    </Pressable>
+
+                    <Pressable
+                        style={[
+                            styles.actionBtn,
+                            styles.withdrawBtn,
+                            { borderColor: c.border, backgroundColor: c.surface },
+                        ]}
+                        onPress={() => handleOpenAction("transfer")}
+                    >
+                        <Ionicons
+                            name="swap-horizontal-outline"
+                            size={16}
+                            color={c.primary}
+                        />
+                        <Text style={[styles.actionBtnText, { color: c.primary }]}>
+                            Mover
                         </Text>
                     </Pressable>
                 </View>
@@ -378,8 +470,75 @@ export default function GoalDetailScreen() {
                         <Text style={[styles.modalTitle, { color: c.text }]}>
                             {actionType === "deposit"
                                 ? "Aportar a la hucha"
-                                : "Retirar dinero de la hucha"}
+                                : actionType === "withdraw"
+                                  ? "Retirar dinero de la hucha"
+                                  : "Mover dinero a otra hucha"}
                         </Text>
+
+                        {actionType !== "deposit" && (
+                            <View
+                                style={[
+                                    styles.helperBanner,
+                                    { backgroundColor: c.background, borderColor: c.border },
+                                ]}
+                            >
+                                <Ionicons name="wallet-outline" size={16} color={c.primary} />
+                                <Text style={[styles.helperBannerText, { color: c.textMuted }]}>
+                                    Saldo disponible:{" "}
+                                    <Text style={{ color: c.text, fontWeight: fontWeight.bold }}>
+                                        {formatMoney(goal.savedAmount)}
+                                    </Text>
+                                </Text>
+                            </View>
+                        )}
+
+                        {actionType === "transfer" && (
+                            <>
+                                <Text style={[styles.modalLabel, { color: c.textMuted }]}>
+                                    Hucha de destino
+                                </Text>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    style={styles.targetGoalsScroll}
+                                    contentContainerStyle={{ gap: spacing.xs }}
+                                >
+                                    {otherGoals.map((og) => {
+                                        const isSelected = targetGoalId === og.id;
+                                        return (
+                                            <Pressable
+                                                key={og.id}
+                                                style={[
+                                                    styles.targetGoalChip,
+                                                    {
+                                                        borderColor: isSelected ? c.primary : c.border,
+                                                        backgroundColor: isSelected
+                                                            ? `${c.primary}18`
+                                                            : c.background,
+                                                    },
+                                                ]}
+                                                onPress={() => setTargetGoalId(og.id)}
+                                            >
+                                                <Text style={{ fontSize: 16 }}>{og.icon || "🐖"}</Text>
+                                                <Text
+                                                    style={[
+                                                        styles.targetGoalName,
+                                                        {
+                                                            color: isSelected ? c.primary : c.text,
+                                                            fontWeight: isSelected
+                                                                ? fontWeight.bold
+                                                                : fontWeight.medium,
+                                                        },
+                                                    ]}
+                                                >
+                                                    {og.name}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </>
+                        )}
 
                         <Text style={[styles.modalLabel, { color: c.textMuted }]}>
                             Importe ({currencySymbol})
@@ -416,7 +575,9 @@ export default function GoalDetailScreen() {
                             placeholder={
                                 actionType === "deposit"
                                     ? "Ej. Ahorro de la semana"
-                                    : "Ej. Pago imprevisto"
+                                    : actionType === "withdraw"
+                                      ? "Ej. Pago imprevisto"
+                                      : "Ej. Mover a otra meta"
                             }
                             placeholderTextColor={c.textMuted}
                             value={noteText}
@@ -441,9 +602,9 @@ export default function GoalDetailScreen() {
                                     styles.modalConfirmBtn,
                                     {
                                         backgroundColor:
-                                            actionType === "deposit"
-                                                ? c.primary
-                                                : c.danger,
+                                            actionType === "withdraw"
+                                                ? c.danger
+                                                : c.primary,
                                     },
                                     actionSubmitting && { opacity: 0.6 },
                                 ]}
@@ -460,7 +621,9 @@ export default function GoalDetailScreen() {
                                         ? "Guardando..."
                                         : actionType === "deposit"
                                           ? "Aportar"
-                                          : "Retirar"}
+                                          : actionType === "withdraw"
+                                            ? "Retirar"
+                                            : "Transferir"}
                                 </Text>
                             </Pressable>
                         </View>
@@ -685,5 +848,33 @@ const styles = StyleSheet.create({
     modalBtnText: {
         fontSize: fontSize.body,
         fontWeight: fontWeight.semibold,
+    },
+    helperBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing.xs,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginBottom: spacing.xs,
+    },
+    helperBannerText: {
+        fontSize: fontSize.caption,
+    },
+    targetGoalsScroll: {
+        marginVertical: 4,
+    },
+    targetGoalChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs + 2,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    targetGoalName: {
+        fontSize: fontSize.caption,
     },
 });

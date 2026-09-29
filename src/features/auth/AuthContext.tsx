@@ -221,7 +221,7 @@ function isBiometricsConfiguredSync(): boolean {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<UserProfile | null>(() => getStoredUser());
     const [biometricsEnabled, setBiometricsEnabledState] = useState<boolean>(() => isBiometricsConfiguredSync());
-    const [isLocked, setIsLocked] = useState<boolean>(() => isBiometricsConfiguredSync());
+    const [isLocked, setIsLocked] = useState<boolean>(() => Boolean(getStoredUser()) && isBiometricsConfiguredSync());
     const [hasBiometricsHardware, setHasBiometricsHardware] = useState(false);
     const [biometricTypeLabel, setBiometricTypeLabel] = useState("Biometría");
 
@@ -261,11 +261,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (mounted) {
                     setBiometricsEnabledState(storedBio);
-                    if (storedBio && (!hasHardware || !isEnrolled)) {
+                    const currentUser = getStoredUser();
+                    if (!currentUser) {
+                        setIsLocked(false);
+                    } else if (storedBio && (!hasHardware || !isEnrolled)) {
                         // Device no longer has biometrics enrolled
                         setIsLocked(false);
                     } else if (storedBio) {
                         setIsLocked(true);
+                    } else {
+                        setIsLocked(false);
                     }
                 }
             } catch (err) {
@@ -311,15 +316,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Handle AppState (lock app when going to background and returning)
     useEffect(() => {
-        if (!biometricsEnabled) return;
+        if (!biometricsEnabled || !user) return;
 
         const subscription = AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
             if (
                 appState.current.match(/inactive|background/) &&
                 nextAppState === "active"
             ) {
-                setIsLocked(true);
-                void unlockApp();
+                if (user) {
+                    setIsLocked(true);
+                    void unlockApp();
+                }
             }
             appState.current = nextAppState;
         });
@@ -327,7 +334,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => {
             subscription.remove();
         };
-    }, [biometricsEnabled, unlockApp]);
+    }, [biometricsEnabled, user, unlockApp]);
 
     // Listen to Supabase Auth State changes & sync session
     useEffect(() => {
@@ -934,6 +941,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         }
         setUser(null);
+        setIsLocked(false);
         try {
             conn.runSync("DELETE FROM app_session WHERE key = 'active_user'");
             // Purge cached local data so it never leaks into another account

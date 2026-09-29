@@ -178,6 +178,17 @@ export async function deleteGoal(id: string): Promise<void> {
 export async function addContribution(
     input: ContributionInput,
 ): Promise<Transaction> {
+    if (input.amount <= 0) {
+        throw new Error("El importe debe ser mayor que cero");
+    }
+
+    if (input.isWithdrawal) {
+        const currentGoal = await getGoalByIdWithProgress(input.goalId);
+        if (!currentGoal || currentGoal.savedAmount < input.amount) {
+            throw new Error("Saldo insuficiente en la hucha para retirar");
+        }
+    }
+
     const now = Date.now();
     const [created] = await db
         .insert(transactions)
@@ -200,4 +211,69 @@ export async function addContribution(
         .returning();
     void syncTransactionToCloud(created);
     return created;
+}
+
+export async function transferBetweenGoals(input: {
+    fromGoalId: string;
+    toGoalId: string;
+    amount: number;
+    note?: string;
+}): Promise<{ withdrawal: Transaction; deposit: Transaction }> {
+    if (input.fromGoalId === input.toGoalId) {
+        throw new Error("No puedes transferir dinero a la misma hucha");
+    }
+    if (input.amount <= 0) {
+        throw new Error("El importe a transferir debe ser mayor que cero");
+    }
+
+    const [fromGoal, toGoal] = await Promise.all([
+        getGoalByIdWithProgress(input.fromGoalId),
+        getGoalByIdWithProgress(input.toGoalId),
+    ]);
+
+    if (!fromGoal) throw new Error("Hucha de origen no encontrada");
+    if (!toGoal) throw new Error("Hucha de destino no encontrada");
+
+    if (fromGoal.savedAmount < input.amount) {
+        throw new Error("Saldo insuficiente en la hucha de origen");
+    }
+
+    const now = Date.now();
+
+    // 1. Withdrawal from origin goal
+    const [withdrawal] = await db
+        .insert(transactions)
+        .values({
+            id: newId(),
+            amount: input.amount,
+            type: "income",
+            savingsGoalId: input.fromGoalId,
+            categoryId: null,
+            date: now,
+            note: input.note?.trim() || `Transferencia a "${toGoal.name}"`,
+            createdAt: now,
+            updatedAt: now,
+        })
+        .returning();
+
+    // 2. Deposit into destination goal
+    const [deposit] = await db
+        .insert(transactions)
+        .values({
+            id: newId(),
+            amount: input.amount,
+            type: "expense",
+            savingsGoalId: input.toGoalId,
+            categoryId: null,
+            date: now + 1,
+            note: input.note?.trim() || `Transferencia desde "${fromGoal.name}"`,
+            createdAt: now + 1,
+            updatedAt: now + 1,
+        })
+        .returning();
+
+    void syncTransactionToCloud(withdrawal);
+    void syncTransactionToCloud(deposit);
+
+    return { withdrawal, deposit };
 }
