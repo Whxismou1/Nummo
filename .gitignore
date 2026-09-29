@@ -40,6 +40,22 @@ yarn-error.*
 
 app-example
 
+# SQLite & databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Binaries & builds
+*.apk
+*.aab
+*.keystore
+
+# Test coverage
+coverage/
+
 # generated native folders
 /ios
 /android
@@ -47,6 +63,8 @@ app-example
 # editor / local tooling (no van al repo)
 .vscode/
 .claude/
+.idea/
+.cursor/
 
 # instrucciones de agentes IA (solo local)
 AGENTS.md

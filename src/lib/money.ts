@@ -1,3 +1,15 @@
+let activeCurrency: string = "EUR";
+
+export function setActiveCurrency(currency: string) {
+    if (currency) {
+        activeCurrency = currency;
+    }
+}
+
+export function getActiveCurrency(): string {
+    return activeCurrency;
+}
+
 export function toCents(text: string): number {
     const formated = text.replace(",", ".");
 
@@ -10,13 +22,22 @@ export function toCents(text: string): number {
     return num;
 }
 
-export function formatMoney(cents: number): string {
-    const euros = cents / 100;
+export function formatMoney(cents: number, currency?: string): string {
+    const curr = currency || activeCurrency || "EUR";
+    const amount = cents / 100;
+    const locale = curr === "USD" ? "en-US" : curr === "GBP" ? "en-GB" : "es-ES";
 
-    const curr = new Intl.NumberFormat('es-ES', {
+    const formatted = new Intl.NumberFormat(locale, {
         style: "currency",
-        currency: "EUR"
-    }).format(euros)
+        currency: curr,
+    }).format(amount);
 
-    return curr;
+    return formatted;
+}
+
+export function getCurrencySymbol(currency?: string): string {
+    const curr = currency || activeCurrency || "EUR";
+    if (curr === "USD") return "$";
+    if (curr === "GBP") return "£";
+    return "€";
 }

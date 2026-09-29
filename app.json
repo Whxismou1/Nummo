@@ -9,12 +9,13 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.whxismou.nummo"
+      "bundleIdentifier": "com.whxismou1.nummo"
     },
     "android": {
-      "package": "com.whxismou.nummo",
+      "package": "com.whxismou1.nummo",
+      "allowBackup": false,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1E1B4B",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -43,11 +44,24 @@
       "expo-font",
       "expo-image",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      "expo-sharing",
+      "expo-secure-store",
+      "expo-local-authentication",
+      "@react-native-google-signin/google-signin",
+      "./plugins/withCustomApkName.js"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bcdf1d4c-f203-4065-adbb-0906ef284230"
+      }
+    },
+    "owner": "whxismou"
   }
 }
