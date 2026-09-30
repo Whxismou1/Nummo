@@ -1,30 +1,27 @@
+import { useAuth } from "@/features/auth/AuthContext";
+import {
+    CURRENCY_CONFIG,
+    useAppSettings
+} from "@/features/settings/SettingsContext";
+import { sendComprehensiveFinancialReport } from "@/services/notifications";
 import { useTheme } from "@/theme";
-import { fontSize, fontWeight } from "@/theme/typography";
 import { spacing } from "@/theme/spacing";
+import { fontSize, fontWeight } from "@/theme/typography";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Pressable,
     ScrollView,
-    Share,
     StyleSheet,
     Switch,
     Text,
-    View,
+    View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import {
-    CURRENCY_CONFIG,
-    CurrencyCode,
-    FirstDayOfWeek,
-    useAppSettings,
-} from "@/features/settings/SettingsContext";
-import { useAuth } from "@/features/auth/AuthContext";
-import { formatDate } from "@/lib/date";
-import { sendComprehensiveFinancialReport } from "@/services/notifications";
 
 export default function SettingsScreen() {
     const { colors: c, themeMode, setThemeMode } = useTheme();
@@ -186,13 +183,6 @@ export default function SettingsScreen() {
                             Preferencias y configuración de la app
                         </Text>
                     </View>
-                    <Pressable
-                        style={[styles.headerIconBtn, { backgroundColor: c.surface, borderColor: c.border }]}
-                        onPress={() => router.push("/auth" as any)}
-                        hitSlop={8}
-                    >
-                        <Ionicons name="person-circle-outline" size={24} color={c.primary} />
-                    </Pressable>
                 </View>
 
                 {/* ── 2. Profile Card ──────────────────────────────────── */}
@@ -205,11 +195,18 @@ export default function SettingsScreen() {
                             }
                         }}
                     >
-                        <View style={[styles.avatar, { backgroundColor: c.primary }]}>
-                            <Text style={styles.avatarText}>
-                                {user ? user.name.charAt(0).toUpperCase() : "N"}
-                            </Text>
-                        </View>
+                        {user?.avatarUrl ? (
+                            <Image
+                                source={{ uri: user.avatarUrl }}
+                                style={styles.avatarImage}
+                            />
+                        ) : (
+                            <View style={[styles.avatar, { backgroundColor: c.primary }]}>
+                                <Text style={styles.avatarText}>
+                                    {user ? user.name.charAt(0).toUpperCase() : "N"}
+                                </Text>
+                            </View>
+                        )}
                         <View style={styles.profileInfo}>
                             <View style={styles.nameRow}>
                                 <Text style={[styles.profileName, { color: c.text }]}>
@@ -724,6 +721,11 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         alignItems: "center",
         justifyContent: "center",
+    },
+    avatarImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
     },
     avatarText: {
         color: "#FFFFFF",

@@ -14,6 +14,7 @@ import {
     StyleSheet,
     Text,
     View,
+    Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -145,19 +146,20 @@ export default function DashboardScreen() {
                         <Pressable
                             style={[
                                 styles.userAvatar,
-                                { backgroundColor: c.primary },
+                                { backgroundColor: user?.avatarUrl ? 'transparent' : c.primary },
                             ]}
-                            onPress={() => {
-                                if (isAuthenticated) {
-                                    router.push("/(tabs)/settings" as any);
-                                } else {
-                                    router.push("/auth" as any);
-                                }
-                            }}
+                            onPress={() => router.push("/(tabs)/settings" as any)}
                         >
-                            <Text style={styles.userAvatarText}>
-                                {user ? user.name.charAt(0).toUpperCase() : "N"}
-                            </Text>
+                            {user?.avatarUrl ? (
+                                <Image
+                                    source={{ uri: user.avatarUrl }}
+                                    style={styles.userAvatarImage}
+                                />
+                            ) : (
+                                <Text style={styles.userAvatarText}>
+                                    {user ? user.name.charAt(0).toUpperCase() : "N"}
+                                </Text>
+                            )}
                         </Pressable>
                     </View>
                 </View>
@@ -780,6 +782,11 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: fontWeight.bold,
         color: "#ffffff",
+    },
+    userAvatarImage: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
     },
     heroCard: {
         borderRadius: 20,
