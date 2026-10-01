@@ -187,7 +187,7 @@ export default function DashboardScreen() {
                     <View style={styles.heroTopRow}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <Text style={styles.heroAvailableLabel}>
-                                Disponible este mes
+                                Saldo disponible
                             </Text>
                             <Pressable
                                 onPress={() => setShowBalances((prev) => !prev)}
@@ -216,13 +216,22 @@ export default function DashboardScreen() {
                     </View>
 
                     <View style={styles.heroSubMetricsGrid}>
+                        {(data?.carryOver ?? 0) !== 0 && (
+                            <View style={[styles.subMetricCard, { width: "100%", marginBottom: 6 }]}>
+                                <View style={styles.subMetricHeader}>
+                                    <Ionicons name="wallet-outline" size={14} color="#ffffff" />
+                                    <Text style={styles.subMetricLabel}>Saldo anterior</Text>
+                                </View>
+                                <Text style={styles.subMetricAmount}>
+                                    {showBalances
+                                        ? formatMoney(data?.carryOver ?? 0, currency)
+                                        : "••••"}
+                                </Text>
+                            </View>
+                        )}
                         <View style={styles.subMetricCard}>
                             <View style={styles.subMetricHeader}>
-                                <Ionicons
-                                    name="arrow-down"
-                                    size={14}
-                                    color="#ffffff"
-                                />
+                                <Ionicons name="arrow-down" size={14} color="#ffffff" />
                                 <Text style={styles.subMetricLabel}>Ingresos</Text>
                             </View>
                             <Text style={styles.subMetricAmount}>
@@ -234,11 +243,7 @@ export default function DashboardScreen() {
 
                         <View style={styles.subMetricCard}>
                             <View style={styles.subMetricHeader}>
-                                <Ionicons
-                                    name="arrow-up"
-                                    size={14}
-                                    color="#ffffff"
-                                />
+                                <Ionicons name="arrow-up" size={14} color="#ffffff" />
                                 <Text style={styles.subMetricLabel}>Gastos</Text>
                             </View>
                             <Text style={styles.subMetricAmount}>

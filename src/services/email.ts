@@ -20,7 +20,6 @@ export async function sendVerificationEmail(
     const apiKey = process.env.EXPO_PUBLIC_RESEND_API_KEY;
 
     if (!apiKey) {
-        // No Resend API key configured: fallback to simulated mode
         return {
             success: true,
             simulated: true,

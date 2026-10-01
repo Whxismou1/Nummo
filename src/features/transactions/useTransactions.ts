@@ -10,15 +10,11 @@ import {
     TransactionWithCategory,
 } from "./repository";
 
-// ── Types ────────────────────────────────────────────────────────────
-
 /** A section for SectionList: one day's worth of transactions */
 export type TransactionSection = {
     title: string; // "Hoy", "Ayer", "lun, 22 sept 2026"
     data: TransactionWithCategory[];
 };
-
-// ── Hook ─────────────────────────────────────────────────────────────
 
 export function useTransactions(period?: string) {
     const activePeriod = period ?? currentPeriod();
@@ -63,7 +59,6 @@ export function useTransactions(period?: string) {
 
     const removeTransaction = useCallback(
         async (id: string) => {
-            // Optimistic update: filter out the deleted transaction immediately without flash
             setSections((prev) =>
                 prev
                     .map((section) => ({
@@ -80,8 +75,6 @@ export function useTransactions(period?: string) {
 
     return { sections, summary, loading, reload: load, removeTransaction };
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────
 
 function groupByDay(
     transactions: TransactionWithCategory[],

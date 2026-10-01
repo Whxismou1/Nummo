@@ -5,8 +5,6 @@ import { eq } from "drizzle-orm";
 import type { CategoryForm } from "./categoryForm";
 import { syncCategoryToCloud, deleteCategoryFromCloud } from "@/services/sync";
 
-// ── Queries ──────────────────────────────────────────────────────────
-
 export const getCategories = async (): Promise<Category[]> => {
     const data = await db.select().from(categories);
     return data;
@@ -31,8 +29,6 @@ export const getCategoryById = async (
 ): Promise<Category | undefined> => {
     return getCategoryByIdSync(id);
 };
-
-// ── Mutations ────────────────────────────────────────────────────────
 
 /**
  * Creates a new category. The DB column `type` still exists but is no

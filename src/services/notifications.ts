@@ -3,7 +3,7 @@ import { getMonthSummary } from "@/features/transactions/repository";
 import { getMonthBudgetsOverview } from "@/features/budgets/repository";
 import { getGoalsWithProgress } from "@/features/goals/repository";
 import { getAllTransactionsForExport } from "@/features/transactions/repository";
-import { currentPeriod, formatPeriod, formatDate } from "@/lib/date";
+import { currentPeriod, formatPeriod, formatDate, periodOf } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import { getAppSetting } from "@/features/settings/SettingsContext";
 import * as XLSX from "xlsx";
@@ -117,51 +117,138 @@ export async function sendAlertEmail(payload: AlertEmailPayload): Promise<boolea
 }
 
 export async function sendComprehensiveFinancialReport(toEmail: string): Promise<{ ok: boolean; error?: string }> {
-    const period = currentPeriod();
-    const periodTitle = formatPeriod(period);
+    const activePeriod = currentPeriod();
+    const periodTitle = formatPeriod(activePeriod);
 
     const [summary, budgetsOverview, goals, allTxs] = await Promise.all([
-        getMonthSummary(period),
-        getMonthBudgetsOverview(period),
+        getMonthSummary(activePeriod),
+        getMonthBudgetsOverview(activePeriod),
         getGoalsWithProgress(),
         getAllTransactionsForExport(),
     ]);
 
+    const periodsSet = new Set<string>();
+    periodsSet.add(activePeriod);
+    allTxs.forEach((t) => periodsSet.add(periodOf(t.date)));
+    const allPeriods = Array.from(periodsSet).sort().reverse();
+
+    const monthlyStats: {
+        period: string;
+        label: string;
+        income: number;
+        expenses: number;
+        balance: number;
+        cumulative: number;
+    }[] = [];
+
+    const chronologicalPeriods = [...allPeriods].reverse();
+    let runningCumulative = 0;
+    const periodCumulativeMap = new Map<string, number>();
+
+    chronologicalPeriods.forEach((p) => {
+        const inc = allTxs
+            .filter((t) => periodOf(t.date) === p && t.type === "income")
+            .reduce((sum, t) => sum + t.amount, 0);
+        const exp = allTxs
+            .filter((t) => periodOf(t.date) === p && t.type === "expense")
+            .reduce((sum, t) => sum + t.amount, 0);
+        const bal = inc - exp;
+        runningCumulative += bal;
+        periodCumulativeMap.set(p, runningCumulative);
+    });
+
+    allPeriods.forEach((p) => {
+        const inc = allTxs
+            .filter((t) => periodOf(t.date) === p && t.type === "income")
+            .reduce((sum, t) => sum + t.amount, 0);
+        const exp = allTxs
+            .filter((t) => periodOf(t.date) === p && t.type === "expense")
+            .reduce((sum, t) => sum + t.amount, 0);
+        const bal = inc - exp;
+        monthlyStats.push({
+            period: p,
+            label: formatPeriod(p),
+            income: inc / 100,
+            expenses: exp / 100,
+            balance: bal / 100,
+            cumulative: (periodCumulativeMap.get(p) ?? 0) / 100,
+        });
+    });
+
     const wb = XLSX.utils.book_new();
 
-    const wsResumen = XLSX.utils.aoa_to_sheet([
+    const optionsText = `(Opciones: ${allPeriods.join(", ")} o TODOS)`;
+    const dashboardRows: any[] = [
         ["INFORME FINANCIERO NUMMO"],
-        [`Periodo: ${periodTitle}`],
+        ["Control mensual, historial completo y fórmulas dinámicas"],
         [],
-        ["Concepto", "Importe"],
-        ["Ingresos totales", formatMoney(summary.totalIncome)],
-        ["Gastos totales", formatMoney(summary.totalExpenses)],
-        ["Balance", formatMoney(summary.balance)],
+        ["SELECTOR DINÁMICO DE MES"],
+        ["Mes a consultar:", activePeriod, optionsText],
+        [
+            "Ingresos del periodo (€):",
+            {
+                t: "n",
+                f: 'IF($B$5="TODOS",SUMIFS(Movimientos!F:F,Movimientos!C:C,"Ingreso"),SUMIFS(Movimientos!F:F,Movimientos!B:B,$B$5,Movimientos!C:C,"Ingreso"))',
+                v: summary.totalIncome / 100,
+            },
+        ],
+        [
+            "Gastos del periodo (€):",
+            {
+                t: "n",
+                f: 'IF($B$5="TODOS",SUMIFS(Movimientos!F:F,Movimientos!C:C,"Gasto"),SUMIFS(Movimientos!F:F,Movimientos!B:B,$B$5,Movimientos!C:C,"Gasto"))',
+                v: summary.totalExpenses / 100,
+            },
+        ],
+        ["Balance del periodo (€):", { t: "n", f: "B6-B7", v: summary.balance / 100 }],
         [],
-        ["Total presupuestado", formatMoney(budgetsOverview.totalBudgeted)],
-        ["Total gastado (presupuestos)", formatMoney(budgetsOverview.totalSpent)]
-    ]);
-    wsResumen["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
-    wsResumen["!cols"] = [{ wch: 30 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+        ["HISTORIAL COMPLETO DE TODOS LOS MESES"],
+        ["Periodo", "Mes", "Ingresos (€)", "Gastos (€)", "Balance (€)", "Saldo Acumulado (€)"],
+        ...monthlyStats.map((m) => [m.period, m.label, m.income, m.expenses, m.balance, m.cumulative]),
+    ];
+
+    const wsDashboard = XLSX.utils.aoa_to_sheet(dashboardRows);
+    wsDashboard["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+        { s: { r: 3, c: 0 }, e: { r: 3, c: 5 } },
+        { s: { r: 9, c: 0 }, e: { r: 9, c: 5 } },
+    ];
+    wsDashboard["!cols"] = [
+        { wch: 28 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 22 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsDashboard, "Dashboard & Meses");
 
     const txData = [
-        ["Fecha", "Tipo", "Categoría", "Nota", "Importe"],
-        ...allTxs.map(tx => [
+        ["Fecha", "Periodo", "Tipo", "Categoría", "Nota", "Importe (€)", "Detalle"],
+        ...allTxs.map((tx) => [
             formatDate(tx.date),
+            periodOf(tx.date),
             tx.type === "income" ? "Ingreso" : "Gasto",
             tx.category?.name || "Sin categoría",
             tx.note || "-",
-            (tx.type === "expense" ? "-" : "") + formatMoney(tx.amount)
-        ])
+            tx.amount / 100,
+            (tx.type === "expense" ? "-" : "+") + formatMoney(tx.amount),
+        ]),
     ];
     const wsMovimientos = XLSX.utils.aoa_to_sheet(txData);
-    wsMovimientos["!cols"] = [{ wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 16 }];
+    wsMovimientos["!cols"] = [
+        { wch: 16 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 20 },
+        { wch: 30 },
+        { wch: 15 },
+        { wch: 16 },
+    ];
     XLSX.utils.book_append_sheet(wb, wsMovimientos, "Movimientos");
 
-    const budgetsData = [
-        ["Categoría", "Límite", "Gastado", "Restante", "% Uso", "Estado"]
-    ];
+    const budgetsData = [["Categoría", "Límite", "Gastado", "Restante", "% Uso", "Estado"]];
     if (budgetsOverview.globalBudget) {
         const gb = budgetsOverview.globalBudget;
         budgetsData.push([
@@ -170,43 +257,57 @@ export async function sendComprehensiveFinancialReport(toEmail: string): Promise
             formatMoney(gb.spentAmount),
             formatMoney(gb.remainingAmount),
             `${Math.round(gb.percentage)}%`,
-            gb.status === "ok" ? "OK" : gb.status === "warn" ? "Alerta" : "Excedido"
+            gb.status === "ok" ? "OK" : gb.status === "warn" ? "Alerta" : "Excedido",
         ]);
     }
-    budgetsOverview.categoryBudgets.forEach(b => {
+    budgetsOverview.categoryBudgets.forEach((b) => {
         budgetsData.push([
-            `${b.categoryIcon || ''} ${b.categoryName || 'Global'}`.trim(),
+            `${b.categoryIcon || ""} ${b.categoryName || "Global"}`.trim(),
             formatMoney(b.limitAmount),
             formatMoney(b.spentAmount),
             formatMoney(b.remainingAmount),
             `${Math.round(b.percentage)}%`,
-            b.status === "ok" ? "OK" : b.status === "warn" ? "Alerta" : "Excedido"
+            b.status === "ok" ? "OK" : b.status === "warn" ? "Alerta" : "Excedido",
         ]);
     });
     const wsPresupuestos = XLSX.utils.aoa_to_sheet(budgetsData);
-    wsPresupuestos["!cols"] = [{ wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }];
+    wsPresupuestos["!cols"] = [
+        { wch: 25 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 12 },
+        { wch: 12 },
+    ];
     XLSX.utils.book_append_sheet(wb, wsPresupuestos, "Presupuestos");
 
     const goalsData = [
         ["Nombre", "Ahorrado", "Meta", "Restante", "% Completado", "Estado"],
-        ...goals.map(g => [
-            `${g.icon || ''} ${g.name}`.trim(),
+        ...goals.map((g) => [
+            `${g.icon || ""} ${g.name}`.trim(),
             formatMoney(g.savedAmount),
             g.targetAmount ? formatMoney(g.targetAmount) : "Sin límite",
             g.remainingAmount !== null ? formatMoney(g.remainingAmount) : "0",
             g.percentage !== null ? `${Math.round(g.percentage)}%` : "∞",
-            g.isCompleted ? "Completada" : "En progreso"
-        ])
+            g.isCompleted ? "Completada" : "En progreso",
+        ]),
     ];
     const wsHuchas = XLSX.utils.aoa_to_sheet(goalsData);
-    wsHuchas["!cols"] = [{ wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
+    wsHuchas["!cols"] = [
+        { wch: 25 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 16 },
+        { wch: 14 },
+        { wch: 14 },
+    ];
     XLSX.utils.book_append_sheet(wb, wsHuchas, "Huchas");
 
-    const base64String = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+    const base64String = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
 
     return sendEmailViaSupabase({
         to: toEmail,
-        subject: `Informe Financiero Nummo - ${periodTitle}`,
+        subject: `Informe Financiero Nummo - Historial Completo`,
         html: `
         <!DOCTYPE html>
         <html>
@@ -215,10 +316,10 @@ export async function sendComprehensiveFinancialReport(toEmail: string): Promise
         </head>
         <body style="font-family: sans-serif; padding: 24px; color: #0F172A;">
           <h2>Nummo</h2>
-          <p>Adjunto encontrarás tu informe financiero mensual de Nummo.</p>
+          <p>Adjunto encontrarás tu informe financiero completo en Excel con selector dinámico de meses y desglose histórico.</p>
         </body>
         </html>
         `,
-        attachments: [{ filename: `informe_nummo_${period}.xlsx`, content: base64String }]
+        attachments: [{ filename: `informe_nummo_completo.xlsx`, content: base64String }],
     });
 }

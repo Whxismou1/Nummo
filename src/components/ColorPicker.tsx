@@ -11,8 +11,6 @@ import {
 import Slider from "@react-native-community/slider";
 import { Ionicons } from "@expo/vector-icons";
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
 function hexToRgb(hex: string) {
     const clean = hex.replace("#", "");
     if (clean.length === 6) {
@@ -34,7 +32,6 @@ function rgbToHex(r: number, g: number, b: number) {
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
 }
 
-// Quick Preset Favorites
 const PRESET_COLORS = [
     "#4F46E5", // Indigo
     "#7C3AED", // Violet
@@ -49,8 +46,6 @@ const PRESET_COLORS = [
     "#64748B", // Slate
     "#1E293B", // Dark Slate
 ];
-
-// ── Main ColorPicker Component ───────────────────────────────────────
 
 type Props = {
     value: string;

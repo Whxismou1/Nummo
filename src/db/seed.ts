@@ -4,7 +4,6 @@ import { newId } from "@/lib/id";
 import { count } from "drizzle-orm";
 
 export const defaultCategories: Omit<NewCategory, "id">[] = [
-    // Gastos
     {
         name: "Pádel & Deporte",
         icon: "🎾",
@@ -54,7 +53,6 @@ export const defaultCategories: Omit<NewCategory, "id">[] = [
         type: "expense",
     },
 
-    // Ingresos
     {
         name: "Nómina Principal",
         icon: "💼",
@@ -96,12 +94,10 @@ export const clearAllUserData = async () => {
  */
 export const seedDefaultData = async () => {
     try {
-        // Ensure app_flags table exists
         conn.execSync(`
             CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, value TEXT);
         `);
 
-        // Check if mocks were already cleared
         const flag = conn.getFirstSync<{ value: string }>(
             "SELECT value FROM app_flags WHERE key = 'mocks_cleared_v2'"
         );
@@ -112,7 +108,6 @@ export const seedDefaultData = async () => {
             );
         }
 
-        // Ensure fresh authentication state on first launch with new auth system
         const authFlag = conn.getFirstSync<{ value: string }>(
             "SELECT value FROM app_flags WHERE key = 'auth_initial_reset_v3'"
         );
@@ -133,7 +128,6 @@ export const seedDefaultData = async () => {
             return;
         }
 
-        // Insert Default Categories only
         for (const cat of defaultCategories) {
             await db.insert(categories).values({
                 id: newId(),
@@ -148,5 +142,4 @@ export const seedDefaultData = async () => {
     }
 };
 
-// Backward compatibility export
 export const seedDefaultCategories = () => seedDefaultData();

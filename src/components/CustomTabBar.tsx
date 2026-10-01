@@ -10,7 +10,6 @@ export function CustomTabBar({ state, descriptors, navigation }: any) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
 
-    // Map route names to tab labels and icons matching Stitch design
     const tabConfig: Record<
         string,
         { label: string; icon: keyof typeof Ionicons.glyphMap; iconActive: keyof typeof Ionicons.glyphMap }
@@ -21,7 +20,6 @@ export function CustomTabBar({ state, descriptors, navigation }: any) {
         settings: { label: "Ajustes", icon: "settings-outline", iconActive: "settings" },
     };
 
-    // Filter routes to include only our 4 main tabs
     const validRoutes = state.routes.filter((route: any) => tabConfig[route.name] !== undefined);
 
     const leftTabs = validRoutes.slice(0, 2);

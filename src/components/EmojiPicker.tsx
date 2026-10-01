@@ -168,7 +168,6 @@ export function EmojiPickerModal({
     const [selectedCat, setSelectedCat] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Normalized search query
     const cleanQuery = searchQuery.trim().toLowerCase();
 
     const displayedEmojis = useMemo(() => {
@@ -176,7 +175,6 @@ export function EmojiPickerModal({
             return EMOJI_CATALOG[selectedCat].items.map((i) => i.emoji);
         }
 
-        // Search through all items across all categories
         const matches: string[] = [];
         for (const cat of EMOJI_CATALOG) {
             for (const item of cat.items) {

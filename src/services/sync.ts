@@ -9,7 +9,6 @@ import { eq } from "drizzle-orm";
  * Provides offline-first instant loading while ensuring data is never lost across reinstalls.
  */
 
-// Ensure sync_deletions table exists to track offline deletions
 try {
     conn.execSync(`
         CREATE TABLE IF NOT EXISTS sync_deletions (
@@ -69,7 +68,6 @@ export async function syncFromCloud(userId: string): Promise<boolean> {
     if (!isSupabaseConfigured()) return false;
 
     try {
-        // 1. Sync Categories
         const { data: cloudCats, error: catErr } = await supabase
             .from("categories")
             .select("*")
@@ -87,7 +85,6 @@ export async function syncFromCloud(userId: string): Promise<boolean> {
             await seedAndUploadDefaultCategories(userId);
         }
 
-        // 2. Sync Savings Goals
         const { data: cloudGoals, error: goalErr } = await supabase
             .from("savings_goals")
             .select("*")
@@ -103,7 +100,6 @@ export async function syncFromCloud(userId: string): Promise<boolean> {
             }
         }
 
-        // 3. Sync Transactions
         const { data: cloudTxs, error: txErr } = await supabase
             .from("transactions")
             .select("*")
@@ -129,7 +125,6 @@ export async function syncFromCloud(userId: string): Promise<boolean> {
             }
         }
 
-        // 4. Sync Budgets
         const { data: cloudBudgets, error: bErr } = await supabase
             .from("budgets")
             .select("*")
@@ -156,7 +151,6 @@ export async function syncToCloud(userId: string): Promise<boolean> {
     if (!isSupabaseConfigured()) return false;
 
     try {
-        // Sync local categories up to cloud
         const localCats = await db.select().from(categories);
         if (localCats.length > 0) {
             await supabase.from("categories").upsert(
@@ -172,7 +166,6 @@ export async function syncToCloud(userId: string): Promise<boolean> {
             );
         }
 
-        // Sync local savings goals
         const localGoals = await db.select().from(savingsGoals);
         if (localGoals.length > 0) {
             await supabase.from("savings_goals").upsert(
@@ -188,7 +181,6 @@ export async function syncToCloud(userId: string): Promise<boolean> {
             );
         }
 
-        // Sync local transactions
         const localTxs = await db.select().from(transactions);
         if (localTxs.length > 0) {
             await supabase.from("transactions").upsert(
@@ -207,7 +199,6 @@ export async function syncToCloud(userId: string): Promise<boolean> {
             );
         }
 
-        // Sync local budgets
         const localBudgets = await db.select().from(budgets);
         if (localBudgets.length > 0) {
             await supabase.from("budgets").upsert(
@@ -253,7 +244,6 @@ export function getActiveUserId(): string | null {
 }
 
 export const DEFAULT_CATEGORY_TEMPLATES = [
-    // Gastos
     { slug: "deporte", name: "Pádel & Deporte", icon: "🎾", color: "#4F46E5", type: "expense" as const },
     { slug: "ocio", name: "Ocio & Salidas", icon: "🍹", color: "#D97706", type: "expense" as const },
     { slug: "alimentacion", name: "Alimentación", icon: "🛒", color: "#E11D48", type: "expense" as const },
@@ -263,7 +253,6 @@ export const DEFAULT_CATEGORY_TEMPLATES = [
     { slug: "salud", name: "Salud & Bienestar", icon: "💊", color: "#DB2777", type: "expense" as const },
     { slug: "compras", name: "Compras & Ropa", icon: "🛍️", color: "#059669", type: "expense" as const },
 
-    // Ingresos
     { slug: "nomina", name: "Nómina Principal", icon: "💼", color: "#16A34A", type: "income" as const },
     { slug: "freelance", name: "Freelance & Extras", icon: "💻", color: "#059669", type: "income" as const },
     { slug: "inversiones", name: "Inversiones", icon: "📈", color: "#2563EB", type: "income" as const },
@@ -288,7 +277,6 @@ export async function resetAndUploadDefaultCategories(userId: string): Promise<v
         created_at: now + idx,
     }));
 
-    // 1. Re-link any existing transactions and budgets to new category IDs by name match
     for (const cat of newCats) {
         try {
             const oldCats = conn.getAllSync<{ id: string }>(
@@ -304,7 +292,6 @@ export async function resetAndUploadDefaultCategories(userId: string): Promise<v
         }
     }
 
-    // 2. Delete old categories from local SQLite that are not in the new set
     try {
         const newCatIds = newCats.map((c) => `'${c.id}'`).join(",");
         conn.runSync(`DELETE FROM categories WHERE id NOT IN (${newCatIds})`);
@@ -312,7 +299,6 @@ export async function resetAndUploadDefaultCategories(userId: string): Promise<v
         console.warn("Could not prune old local categories:", e);
     }
 
-    // 3. Upsert clean categories into local SQLite
     for (const cat of newCats) {
         conn.runSync(
             "INSERT OR REPLACE INTO categories (id, name, icon, color, type, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -320,13 +306,10 @@ export async function resetAndUploadDefaultCategories(userId: string): Promise<v
         );
     }
 
-    // 4. In Supabase: delete previous cloud categories for this user and upsert the new set
     if (isSupabaseConfigured()) {
         try {
-            // Delete old cloud categories
             await supabase.from("categories").delete().eq("user_id", userId);
 
-            // Upsert new clean categories
             const { error: catErr } = await supabase.from("categories").upsert(newCats);
             if (catErr) {
                 console.error("Supabase clean categories upsert error:", catErr.message);
@@ -334,7 +317,6 @@ export async function resetAndUploadDefaultCategories(userId: string): Promise<v
                 console.log("Clean categories successfully uploaded to Supabase!");
             }
 
-            // Sync all existing local transactions to Supabase now that new categories exist
             const localTxs = await db.select().from(transactions);
             if (localTxs.length > 0) {
                 const { error: txErr } = await supabase.from("transactions").upsert(
@@ -370,7 +352,6 @@ export const seedAndUploadDefaultCategories = resetAndUploadDefaultCategories;
 export async function syncAll(userId: string): Promise<void> {
     if (!isSupabaseConfigured() || !userId) return;
     try {
-        // First process any deletions that occurred while offline
         await processPendingDeletions();
 
         const flag = conn.getFirstSync<{ value: string }>(
@@ -410,7 +391,6 @@ export async function syncTransactionToCloud(tx: {
     }
 
     try {
-        // Ensure category exists in Supabase first to satisfy foreign key constraint
         if (tx.categoryId) {
             try {
                 const cat = conn.getFirstSync<{
@@ -440,7 +420,6 @@ export async function syncTransactionToCloud(tx: {
             }
         }
 
-        // Ensure savings goal exists in Supabase first to satisfy foreign key constraint
         if (tx.savingsGoalId) {
             try {
                 const goal = conn.getFirstSync<{
@@ -618,7 +597,6 @@ export async function syncBudgetToCloud(b: {
     if (!userId) return;
 
     try {
-        // Ensure category exists in Supabase first if categoryId is set
         if (b.categoryId) {
             try {
                 const cat = conn.getFirstSync<{

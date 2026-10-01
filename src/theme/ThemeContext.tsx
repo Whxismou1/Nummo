@@ -31,7 +31,6 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Ensure app_settings table exists for persisting preferences
 try {
     conn.execSync(`
         CREATE TABLE IF NOT EXISTS app_settings (

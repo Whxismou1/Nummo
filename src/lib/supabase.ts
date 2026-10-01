@@ -63,7 +63,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
 });
 
-// React Native halts JS timers in background; startAutoRefresh on foreground keeps refresh tokens alive seamlessly
 if (Platform.OS !== "web") {
     try {
         AppState.addEventListener("change", (state) => {

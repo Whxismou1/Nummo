@@ -190,6 +190,23 @@ export const getMonthSummarySync = (
     }
 };
 
+export const getCarryOverBalance = (period: string): number => {
+    try {
+        const start = monthStart(period);
+        const row = conn.getFirstSync<{ balance: number }>(
+            `SELECT COALESCE(
+                SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) -
+                SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END),
+                0
+            ) as balance FROM transactions WHERE date < ?`,
+            [start]
+        );
+        return Number(row?.balance ?? 0);
+    } catch {
+        return 0;
+    }
+};
+
 export const getAllTransactionsForExport = async (): Promise<TransactionWithCategory[]> => {
     const rows = await db
         .select({

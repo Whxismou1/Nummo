@@ -1,14 +1,15 @@
 import { db } from "@/db";
 import { categories, transactions } from "@/db/schema";
 import { monthEnd, monthStart } from "@/lib/date";
-import { getMonthSummary, type TransactionWithCategory } from "@/features/transactions/repository";
+import { getCarryOverBalance, getMonthSummary, type TransactionWithCategory } from "@/features/transactions/repository";
 import { getMonthBudgetsOverview, type BudgetProgress } from "@/features/budgets/repository";
 import { getGoalsWithProgress, type GoalProgress } from "@/features/goals/repository";
 import { and, between, desc, eq } from "drizzle-orm";
 
 export interface DashboardData {
     period: string;
-    availableBalance: number; // totalIncome - totalExpenses
+    carryOver: number;
+    availableBalance: number;
     totalIncome: number;
     totalExpenses: number;
     topBudgets: BudgetProgress[];
@@ -20,16 +21,9 @@ export async function getDashboardData(period: string): Promise<DashboardData> {
     const start = monthStart(period);
     const end = monthEnd(period);
 
-    // 1. Month summary (income, expenses, balance)
     const summaryPromise = getMonthSummary(period);
-
-    // 2. Budget envelopes
     const budgetsOverviewPromise = getMonthBudgetsOverview(period);
-
-    // 3. Savings goals
     const goalsPromise = getGoalsWithProgress();
-
-    // 4. Recent transactions (last 4 of the month)
     const recentTxRowsPromise = db
         .select({
             id: transactions.id,
@@ -87,15 +81,16 @@ export async function getDashboardData(period: string): Promise<DashboardData> {
             : null,
     }));
 
-    // Top 3 category budgets by percentage of usage
     const topBudgets = budgetsOverview.categoryBudgets.slice(0, 3);
 
-    // Featured goal: the first one with target or active savings
     const featuredGoal = allGoals.length > 0 ? allGoals[0] : null;
+
+    const carryOver = getCarryOverBalance(period);
 
     return {
         period,
-        availableBalance: summary.balance,
+        carryOver,
+        availableBalance: carryOver + summary.totalIncome - summary.totalExpenses,
         totalIncome: summary.totalIncome,
         totalExpenses: summary.totalExpenses,
         topBudgets,
