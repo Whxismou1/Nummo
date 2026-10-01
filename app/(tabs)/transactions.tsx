@@ -1,4 +1,5 @@
 import { useTransactions } from "@/features/transactions/useTransactions";
+import { currentPeriod, formatPeriod } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import { useTheme } from "@/theme";
 import { fontSize, fontWeight } from "@/theme/typography";
@@ -25,8 +26,17 @@ export default function TransactionsScreen() {
     const insets = useSafeAreaInsets();
     const styles = useMemo(() => createStyles(c), [c]);
 
-    const { sections, summary, loading, reload, removeTransaction } =
-        useTransactions();
+    const {
+        period,
+        goToPrevMonth,
+        goToNextMonth,
+        goToCurrentMonth,
+        sections,
+        summary,
+        loading,
+        reload,
+        removeTransaction,
+    } = useTransactions();
     const router = useRouter();
 
     const [filter, setFilter] = useState<"all" | "expense" | "income">("all");
@@ -52,10 +62,6 @@ export default function TransactionsScreen() {
         );
     }, [removeTransaction]);
 
-    const currentMonthName = new Date().toLocaleDateString("es-ES", { month: "long" });
-    const capitalizedMonth = currentMonthName.charAt(0).toUpperCase() + currentMonthName.slice(1);
-
-    // Filtered sections and item counts
     const counts = useMemo(() => {
         let all = 0;
         let expense = 0;
@@ -85,8 +91,26 @@ export default function TransactionsScreen() {
             <View style={styles.headerContainer}>
                 <View style={styles.titleRow}>
                     <Text style={styles.title}>Movimientos</Text>
-                    <View style={styles.monthPill}>
-                        <Text style={styles.monthPillText}>{capitalizedMonth}</Text>
+                    <View style={styles.periodSelectorContainer}>
+                        <Pressable onPress={goToPrevMonth} hitSlop={10} style={styles.periodArrow}>
+                            <Ionicons name="chevron-back" size={18} color={c.text} />
+                        </Pressable>
+                        <View style={styles.monthPill}>
+                            <Ionicons name="calendar-outline" size={14} color={c.primary} />
+                            <Text style={styles.monthPillText}>{formatPeriod(period)}</Text>
+                        </View>
+                        <Pressable
+                            onPress={goToNextMonth}
+                            hitSlop={10}
+                            style={styles.periodArrow}
+                            disabled={period >= currentPeriod()}
+                        >
+                            <Ionicons
+                                name="chevron-forward"
+                                size={18}
+                                color={period >= currentPeriod() ? `${c.textMuted}40` : c.text}
+                            />
+                        </Pressable>
                     </View>
                 </View>
 
@@ -192,7 +216,7 @@ export default function TransactionsScreen() {
                 </View>
             </View>
         ),
-        [styles, capitalizedMonth, c, hideBalances, summary, currency, filter, counts]
+        [styles, period, goToPrevMonth, goToNextMonth, c, hideBalances, summary, currency, filter, counts]
     );
 
     const listEmpty = useMemo(() => {
@@ -346,6 +370,14 @@ const createStyles = (c: ReturnType<typeof import("@/theme").useTheme>["colors"]
             fontSize: fontSize.heading,
             fontWeight: fontWeight.bold,
             color: c.text,
+        },
+        periodSelectorContainer: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+        },
+        periodArrow: {
+            padding: 4,
         },
         monthPill: {
             flexDirection: "row",

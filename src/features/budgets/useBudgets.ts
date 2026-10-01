@@ -1,5 +1,6 @@
 import { currentPeriod, nextPeriod, prevPeriod } from "@/lib/date";
 import { useCallback, useEffect, useState } from "react";
+import { DeviceEventEmitter } from "react-native";
 import {
     deleteBudget,
     getMonthBudgetsOverview,
@@ -25,6 +26,13 @@ export function useBudgets(initialPeriod: string = currentPeriod()) {
 
     useEffect(() => {
         void reload();
+    }, [reload]);
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener("nummo_sync_completed", () => {
+            void reload();
+        });
+        return () => sub.remove();
     }, [reload]);
 
     const goToPrevMonth = useCallback(() => {

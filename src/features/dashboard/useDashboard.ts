@@ -1,12 +1,13 @@
 import { currentPeriod, prevPeriod, nextPeriod } from "@/lib/date";
 import { useCallback, useEffect, useState, useRef } from "react";
-import { getDashboardData, type DashboardData } from "./repository";
+import { DeviceEventEmitter } from "react-native";
+import { getDashboardData, getDashboardDataSync, type DashboardData } from "./repository";
 
 export function useDashboard() {
     const [period, setPeriod] = useState(currentPeriod);
-    const [data, setData] = useState<DashboardData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const initialLoadDone = useRef(false);
+    const [data, setData] = useState<DashboardData | null>(() => getDashboardDataSync(currentPeriod()));
+    const [loading, setLoading] = useState(() => !getDashboardDataSync(currentPeriod()));
+    const initialLoadDone = useRef(Boolean(getDashboardDataSync(currentPeriod())));
 
     const reload = useCallback(async () => {
         try {
@@ -24,8 +25,14 @@ export function useDashboard() {
     }, [period]);
 
     useEffect(() => {
-        initialLoadDone.current = false;
         void reload();
+    }, [reload]);
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener("nummo_sync_completed", () => {
+            void reload();
+        });
+        return () => sub.remove();
     }, [reload]);
 
     const goToPrevMonth = useCallback(() => setPeriod((p) => prevPeriod(p)), []);

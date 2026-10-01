@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { DeviceEventEmitter } from "react-native";
 import {
     deleteGoal,
     getGoalsWithProgress,
@@ -23,6 +24,13 @@ export function useGoals() {
 
     useEffect(() => {
         void reload();
+    }, [reload]);
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener("nummo_sync_completed", () => {
+            void reload();
+        });
+        return () => sub.remove();
     }, [reload]);
 
     const removeGoal = useCallback(

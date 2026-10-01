@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { currentPeriod, formatDayGroup, isSameDay } from "@/lib/date";
+import { currentPeriod, prevPeriod, nextPeriod, formatDayGroup, isSameDay } from "@/lib/date";
+import { DeviceEventEmitter } from "react-native";
 import {
     deleteTransaction,
     getMonthSummary,
@@ -10,18 +11,17 @@ import {
     TransactionWithCategory,
 } from "./repository";
 
-/** A section for SectionList: one day's worth of transactions */
 export type TransactionSection = {
-    title: string; // "Hoy", "Ayer", "lun, 22 sept 2026"
+    title: string;
     data: TransactionWithCategory[];
 };
 
-export function useTransactions(period?: string) {
-    const activePeriod = period ?? currentPeriod();
+export function useTransactions(initialPeriod: string = currentPeriod()) {
+    const [period, setPeriod] = useState<string>(initialPeriod);
 
     const [sections, setSections] = useState<TransactionSection[]>(() => {
         try {
-            const txs = getTransactionsForPeriodSync(activePeriod);
+            const txs = getTransactionsForPeriodSync(period);
             return groupByDay(txs);
         } catch {
             return [];
@@ -29,7 +29,7 @@ export function useTransactions(period?: string) {
     });
     const [summary, setSummary] = useState<MonthSummary>(() => {
         try {
-            return getMonthSummarySync(activePeriod);
+            return getMonthSummarySync(period);
         } catch {
             return {
                 totalIncome: 0,
@@ -43,19 +43,38 @@ export function useTransactions(period?: string) {
     const load = useCallback(async () => {
         try {
             const [txs, monthSummary] = await Promise.all([
-                getTransactionsForPeriod(activePeriod),
-                getMonthSummary(activePeriod),
+                getTransactionsForPeriod(period),
+                getMonthSummary(period),
             ]);
             setSections(groupByDay(txs));
             setSummary(monthSummary);
         } finally {
             setLoading(false);
         }
-    }, [activePeriod]);
+    }, [period]);
 
     useEffect(() => {
         void load();
     }, [load]);
+
+    useEffect(() => {
+        const sub = DeviceEventEmitter.addListener("nummo_sync_completed", () => {
+            void load();
+        });
+        return () => sub.remove();
+    }, [load]);
+
+    const goToPrevMonth = useCallback(() => {
+        setPeriod((p) => prevPeriod(p));
+    }, []);
+
+    const goToNextMonth = useCallback(() => {
+        setPeriod((p) => nextPeriod(p));
+    }, []);
+
+    const goToCurrentMonth = useCallback(() => {
+        setPeriod(currentPeriod());
+    }, []);
 
     const removeTransaction = useCallback(
         async (id: string) => {
@@ -73,7 +92,18 @@ export function useTransactions(period?: string) {
         [load],
     );
 
-    return { sections, summary, loading, reload: load, removeTransaction };
+    return {
+        period,
+        setPeriod,
+        goToPrevMonth,
+        goToNextMonth,
+        goToCurrentMonth,
+        sections,
+        summary,
+        loading,
+        reload: load,
+        removeTransaction,
+    };
 }
 
 function groupByDay(

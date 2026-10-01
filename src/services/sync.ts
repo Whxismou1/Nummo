@@ -2,6 +2,7 @@ import { db, conn } from "@/db";
 import { categories, transactions, budgets, savingsGoals } from "@/db/schema";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { eq } from "drizzle-orm";
+import { DeviceEventEmitter } from "react-native";
 
 /**
  * Sync Service for Nummo
@@ -366,6 +367,7 @@ export async function syncAll(userId: string): Promise<void> {
             await syncFromCloud(userId);
             await syncToCloud(userId);
         }
+        DeviceEventEmitter.emit("nummo_sync_completed");
     } catch (e) {
         console.warn("syncAll error:", e);
     }

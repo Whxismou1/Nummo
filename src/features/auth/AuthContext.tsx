@@ -140,7 +140,7 @@ function persistUserSession(profile: UserProfile): void {
     try {
         conn.runSync(
             `INSERT OR REPLACE INTO users (id, name, email, password, provider, avatar_url, created_at)
-             VALUES (?, ?, ?, (SELECT password FROM users WHERE id = ?), ?, ?, ?)`,
+             VALUES (?, ?, ?, (SELECT password FROM users WHERE id = ?), ?, COALESCE(?, (SELECT avatar_url FROM users WHERE id = ?)), ?)`,
             [
                 profile.id,
                 profile.name,
@@ -148,6 +148,7 @@ function persistUserSession(profile: UserProfile): void {
                 profile.id,
                 profile.provider,
                 profile.avatarUrl || null,
+                profile.id,
                 profile.createdAt || Date.now(),
             ]
         );
@@ -345,14 +346,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
             if (session?.user) {
+                const existingUserRow = conn.getFirstSync<{ avatar_url: string | null }>(
+                    "SELECT avatar_url FROM users WHERE id = ? LIMIT 1",
+                    [session.user.id]
+                );
+                const avatar =
+                    session.user.user_metadata?.avatar_url ||
+                    session.user.user_metadata?.picture ||
+                    session.user.user_metadata?.photo ||
+                    existingUserRow?.avatar_url ||
+                    undefined;
+
                 const cloudProfile: UserProfile = {
                     id: session.user.id,
                     name:
+                        session.user.user_metadata?.full_name ||
                         session.user.user_metadata?.name ||
                         session.user.email?.split("@")[0] ||
                         "Usuario",
                     email: (session.user.email || "").toLowerCase(),
                     provider: (session.user.app_metadata?.provider as any) || "email",
+                    avatarUrl: avatar,
                     createdAt: new Date(session.user.created_at).getTime() || Date.now(),
                 };
                 persistUserSession(cloudProfile);
@@ -368,14 +382,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } = supabase.auth.onAuthStateChange(async (_event, session) => {
             if (!mounted) return;
             if (session?.user) {
+                const existingUserRow = conn.getFirstSync<{ avatar_url: string | null }>(
+                    "SELECT avatar_url FROM users WHERE id = ? LIMIT 1",
+                    [session.user.id]
+                );
+                const avatar =
+                    session.user.user_metadata?.avatar_url ||
+                    session.user.user_metadata?.picture ||
+                    session.user.user_metadata?.photo ||
+                    existingUserRow?.avatar_url ||
+                    undefined;
+
                 const cloudProfile: UserProfile = {
                     id: session.user.id,
                     name:
+                        session.user.user_metadata?.full_name ||
                         session.user.user_metadata?.name ||
                         session.user.email?.split("@")[0] ||
                         "Usuario",
                     email: (session.user.email || "").toLowerCase(),
                     provider: (session.user.app_metadata?.provider as any) || "email",
+                    avatarUrl: avatar,
                     createdAt: new Date(session.user.created_at).getTime() || Date.now(),
                 };
                 persistUserSession(cloudProfile);
