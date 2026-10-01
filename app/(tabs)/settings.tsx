@@ -148,8 +148,8 @@ export default function SettingsScreen() {
                 );
             } else {
                 Alert.alert(
-                    "Informe generado",
-                    `Se ha procesado tu solicitud para ${user.email}. Si has desplegado la Edge Function 'send-email' en Supabase, revisa tu bandeja de entrada o spam.`
+                    "Informe enviado",
+                    `Revisa tu bandeja de entrada en ${user.email}. Si no lo ves, comprueba la carpeta de spam.`
                 );
             }
         } catch (e: any) {
@@ -175,7 +175,6 @@ export default function SettingsScreen() {
                 ]}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ── 1. Header ────────────────────────────────────────── */}
                 <View style={styles.header}>
                     <View>
                         <Text style={[styles.title, { color: c.text }]}>Ajustes</Text>
@@ -185,7 +184,6 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 2. Profile Card ──────────────────────────────────── */}
                 <View style={[styles.profileCard, { backgroundColor: c.surface, borderColor: c.border }]}>
                     <Pressable
                         style={styles.profileRow}
@@ -264,13 +262,11 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 3. Preferencias ──────────────────────────────────── */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
                         PREFERENCIAS
                     </Text>
                     <View style={[styles.cardGroup, { backgroundColor: c.surface, borderColor: c.border }]}>
-                        {/* Currency */}
                         <Pressable
                             style={styles.cardItem}
                             onPress={handleSelectCurrency}
@@ -294,7 +290,6 @@ export default function SettingsScreen() {
 
                         <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-                        {/* First day of week */}
                         <Pressable
                             style={styles.cardItem}
                             onPress={handleSelectFirstDay}
@@ -318,7 +313,6 @@ export default function SettingsScreen() {
 
                         <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-                        {/* Theme switcher */}
                         <View style={styles.themeRow}>
                             <View style={styles.themeRowHeader}>
                                 <View style={[styles.itemIconBox, { backgroundColor: c.track }]}>
@@ -406,13 +400,11 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 4. Gestión de Organización & Categorías ──────────── */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
                         GESTIÓN Y ORGANIZACIÓN
                     </Text>
                     <View style={[styles.cardGroup, { backgroundColor: c.surface, borderColor: c.border }]}>
-                        {/* Categorías */}
                         <Pressable
                             style={styles.cardItem}
                             onPress={() => router.push("/(tabs)/categories" as any)}
@@ -446,7 +438,6 @@ export default function SettingsScreen() {
 
                         <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-                        {/* Historial de Movimientos */}
                         <Pressable
                             style={styles.cardItem}
                             onPress={() => router.push("/(tabs)/transactions" as any)}
@@ -467,13 +458,11 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 5. Datos & Exportación ───────────────────────────── */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
                         DATOS Y PRIVACIDAD
                     </Text>
                     <View style={[styles.cardGroup, { backgroundColor: c.surface, borderColor: c.border }]}>
-                        {/* Enviar informe financiero por correo */}
                         <Pressable
                             style={styles.cardItem}
                             onPress={handleSendFinancialReport}
@@ -503,7 +492,6 @@ export default function SettingsScreen() {
 
                         <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-                        {/* Hide balances */}
                         <View style={styles.cardItem}>
                             <View style={styles.itemLeft}>
                                 <View style={[styles.itemIconBox, { backgroundColor: c.track }]}>
@@ -526,13 +514,11 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 6. Notificaciones & Alertas ──────────────────────── */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
                         NOTIFICACIONES Y ALERTAS
                     </Text>
                     <View style={[styles.cardGroup, { backgroundColor: c.surface, borderColor: c.border }]}>
-                        {/* Notificaciones App */}
                         <View style={styles.cardItem}>
                             <View style={styles.itemLeft}>
                                 <View style={[styles.itemIconBox, { backgroundColor: c.track }]}>
@@ -557,7 +543,6 @@ export default function SettingsScreen() {
 
                         <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-                        {/* Alertas por Correo */}
                         <View style={styles.cardItem}>
                             <View style={styles.itemLeft}>
                                 <View style={[styles.itemIconBox, { backgroundColor: c.track }]}>
@@ -599,13 +584,11 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 7. Seguridad ─────────────────────────────────────── */}
                 <View style={styles.section}>
                     <Text style={[styles.sectionTitle, { color: c.textMuted }]}>
                         SEGURIDAD
                     </Text>
                     <View style={[styles.cardGroup, { backgroundColor: c.surface, borderColor: c.border }]}>
-                        {/* Biometrics */}
                         <View style={styles.cardItem}>
                             <View style={styles.itemLeft}>
                                 <View style={[styles.itemIconBox, { backgroundColor: c.track }]}>
@@ -641,7 +624,6 @@ export default function SettingsScreen() {
                     </View>
                 </View>
 
-                {/* ── 7. Cerrar sesión ────────────────────────────────── */}
                 {isAuthenticated && (
                     <View style={styles.section}>
                         <Pressable
@@ -662,7 +644,6 @@ export default function SettingsScreen() {
                     </View>
                 )}
 
-                {/* ── 8. Version Footer ────────────────────────────────── */}
                 <View style={styles.footer}>
                     <Text style={[styles.footerText, { color: c.textMuted }]}>
                         Nummo • v1.0.4

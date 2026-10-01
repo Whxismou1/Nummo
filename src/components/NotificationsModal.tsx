@@ -47,11 +47,9 @@ export function NotificationsModal({
 
     if (!visible) return null;
 
-    // Build notifications dynamically from financial status
     const items: NotificationItem[] = [];
 
     if (data) {
-        // 1. Budget warnings
         for (const b of data.topBudgets) {
             if (b.status === "over") {
                 const overAmount = b.spentAmount - b.limitAmount;
@@ -77,7 +75,6 @@ export function NotificationsModal({
             }
         }
 
-        // 2. Goal milestones
         if (data.featuredGoal) {
             const fg = data.featuredGoal;
             if (fg.isCompleted) {
@@ -103,7 +100,6 @@ export function NotificationsModal({
             }
         }
 
-        // 3. Balance alerts
         if (data.availableBalance < 0) {
             items.push({
                 id: "balance_negative",
@@ -117,7 +113,6 @@ export function NotificationsModal({
         }
     }
 
-    // Always include a system status notice if list is empty or as footer notice
     if (items.length === 0) {
         items.push({
             id: "system_ok",
@@ -130,7 +125,6 @@ export function NotificationsModal({
         });
     }
 
-    // General security & backup info
     items.push({
         id: "security_info",
         type: "info",
@@ -193,7 +187,6 @@ export function NotificationsModal({
                     ]}
                     onPress={(e) => e.stopPropagation()}
                 >
-                    {/* Header */}
                     <View style={styles.header}>
                         <View style={styles.headerLeft}>
                             <View
@@ -227,7 +220,6 @@ export function NotificationsModal({
                         </Pressable>
                     </View>
 
-                    {/* Channel Indicators Bar */}
                     <View style={[styles.channelsBar, { backgroundColor: c.background, borderColor: c.border }]}>
                         <View style={styles.channelItem}>
                             <Ionicons
@@ -252,7 +244,6 @@ export function NotificationsModal({
                         </View>
                     </View>
 
-                    {/* Scrollable Alerts List */}
                     <ScrollView
                         style={styles.list}
                         contentContainerStyle={styles.listContent}
@@ -321,7 +312,6 @@ export function NotificationsModal({
                                         {item.description}
                                     </Text>
 
-                                    {/* Distinction of channels: App vs Correo */}
                                     <View style={styles.tagsRow}>
                                         <View
                                             style={[
@@ -395,7 +385,6 @@ export function NotificationsModal({
                         })}
                     </ScrollView>
 
-                    {/* Footer Actions */}
                     <View style={styles.footer}>
                         {notificationsEmail && userEmail && (
                             <Pressable

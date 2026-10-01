@@ -9,7 +9,6 @@ import { newId } from "@/lib/id";
 import { desc, eq, sql } from "drizzle-orm";
 import { syncGoalToCloud, deleteGoalFromCloud, syncTransactionToCloud } from "@/services/sync";
 
-// ── Types ────────────────────────────────────────────────────────────
 
 export interface GoalProgress extends SavingsGoal {
     savedAmount: number; // in cents
@@ -26,7 +25,6 @@ export interface ContributionInput {
     date?: number;
 }
 
-// ── Queries ──────────────────────────────────────────────────────────
 
 export async function getGoalsWithProgress(): Promise<GoalProgress[]> {
     const allGoals = await db
@@ -34,7 +32,6 @@ export async function getGoalsWithProgress(): Promise<GoalProgress[]> {
         .from(savingsGoals)
         .orderBy(desc(savingsGoals.createdAt));
 
-    // Aggregate contributions: expense = money put into goal, income = money taken out of goal
     const contributions = await db
         .select({
             goalId: transactions.savingsGoalId,
@@ -115,7 +112,6 @@ export async function getGoalTransactions(
         .orderBy(desc(transactions.date), desc(transactions.createdAt));
 }
 
-// ── Mutations ────────────────────────────────────────────────────────
 
 export async function createGoal(data: {
     name: string;
@@ -165,7 +161,6 @@ export async function updateGoal(
 }
 
 export async function deleteGoal(id: string): Promise<void> {
-    // Unlink any transactions associated with this savings goal
     await db
         .update(transactions)
         .set({ savingsGoalId: null })
@@ -240,7 +235,6 @@ export async function transferBetweenGoals(input: {
 
     const now = Date.now();
 
-    // 1. Withdrawal from origin goal
     const [withdrawal] = await db
         .insert(transactions)
         .values({
@@ -256,7 +250,6 @@ export async function transferBetweenGoals(input: {
         })
         .returning();
 
-    // 2. Deposit into destination goal
     const [deposit] = await db
         .insert(transactions)
         .values({

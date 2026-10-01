@@ -1,8 +1,9 @@
-import { currentPeriod } from "@/lib/date";
+import { currentPeriod, prevPeriod, nextPeriod } from "@/lib/date";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { getDashboardData, type DashboardData } from "./repository";
 
-export function useDashboard(period: string = currentPeriod()) {
+export function useDashboard() {
+    const [period, setPeriod] = useState(currentPeriod);
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const initialLoadDone = useRef(false);
@@ -23,12 +24,19 @@ export function useDashboard(period: string = currentPeriod()) {
     }, [period]);
 
     useEffect(() => {
+        initialLoadDone.current = false;
         void reload();
     }, [reload]);
 
+    const goToPrevMonth = useCallback(() => setPeriod((p) => prevPeriod(p)), []);
+    const goToNextMonth = useCallback(() => setPeriod((p) => nextPeriod(p)), []);
+
     return {
+        period,
         data,
         loading,
         reload,
+        goToPrevMonth,
+        goToNextMonth,
     };
 }

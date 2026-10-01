@@ -27,7 +27,6 @@ export const CURRENCY_CONFIG: Record<CurrencyCode, { name: string; symbol: strin
     GBP: { name: "Libra (£)", symbol: "£", locale: "en-GB" },
 };
 
-// Ensure app_settings table exists
 try {
     conn.execSync(`
         CREATE TABLE IF NOT EXISTS app_settings (
@@ -137,7 +136,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 export function useAppSettings() {
     const ctx = useContext(SettingsContext);
     if (!ctx) {
-        // Fallback for isolated tests or unmounted context
         const currency = getAppSetting("currency");
         const hideBalances = getAppSetting("hideBalances");
         const notificationsApp = getAppSetting("notificationsApp");

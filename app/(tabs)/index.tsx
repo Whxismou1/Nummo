@@ -1,5 +1,5 @@
 import { useDashboard } from "@/features/dashboard/useDashboard";
-import { formatDayGroup, formatPeriod } from "@/lib/date";
+import { currentPeriod, formatDayGroup, formatPeriod } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import { useTheme } from "@/theme";
 import { fontSize, fontWeight } from "@/theme/typography";
@@ -41,7 +41,7 @@ export default function DashboardScreen() {
         setShowBalances(!hideBalances);
     }, [hideBalances]);
 
-    const { data, loading, reload } = useDashboard();
+    const { period, data, loading, reload, goToPrevMonth, goToNextMonth } = useDashboard();
 
     useFocusEffect(
         useCallback(() => {
@@ -66,13 +66,11 @@ export default function DashboardScreen() {
     const income = data?.totalIncome ?? 0;
     const expenses = data?.totalExpenses ?? 0;
 
-    // Formatting whole and cents parts for hero typography
     const availableCents = Math.abs(available);
     const wholePart = Math.floor(availableCents / 100).toLocaleString("es-ES");
     const decimalPart = String(availableCents % 100).padStart(2, "0");
     const isNegativeBalance = available < 0;
 
-    // Circular progress math for featured goal
     const radius = 22;
     const circumference = 2 * Math.PI * radius;
     const goalPct = data?.featuredGoal?.percentage
@@ -97,19 +95,33 @@ export default function DashboardScreen() {
                 ]}
                 showsVerticalScrollIndicator={false}
             >
-                {/* ── 1. Greeting Bar (Stitch Design) ──────────────── */}
                 <View style={styles.greetingBar}>
                     <View style={styles.greetingTextCol}>
-                        <Text style={[styles.periodLabel, { color: c.textMuted }]}>
-                            {data ? formatPeriod(data.period) : "Septiembre 2026"}
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Pressable onPress={goToPrevMonth} hitSlop={10}>
+                                <Ionicons name="chevron-back" size={16} color={c.textMuted} />
+                            </Pressable>
+                            <Text style={[styles.periodLabel, { color: c.textMuted }]}>
+                                {formatPeriod(period)}
+                            </Text>
+                            <Pressable
+                                onPress={goToNextMonth}
+                                hitSlop={10}
+                                disabled={period >= currentPeriod()}
+                            >
+                                <Ionicons
+                                    name="chevron-forward"
+                                    size={16}
+                                    color={period >= currentPeriod() ? `${c.textMuted}40` : c.textMuted}
+                                />
+                            </Pressable>
+                        </View>
                         <Text style={[styles.greetingTitle, { color: c.text }]}>
                             {user ? `Hola, ${user.name.split(" ")[0]} 👋` : "Hola 👋"}
                         </Text>
                     </View>
 
                     <View style={styles.headerRightActions}>
-                        {/* Notifications / Alerts Button */}
                         <Pressable
                             style={[
                                 styles.iconCircleBtn,
@@ -142,7 +154,6 @@ export default function DashboardScreen() {
                             )}
                         </Pressable>
 
-                        {/* Avatar */}
                         <Pressable
                             style={[
                                 styles.userAvatar,
@@ -164,7 +175,6 @@ export default function DashboardScreen() {
                     </View>
                 </View>
 
-                {/* ── 2. Hero Balance Card (Stitch Design) ─────────── */}
                 <View
                     style={[
                         styles.heroCard,
@@ -174,7 +184,6 @@ export default function DashboardScreen() {
                         },
                     ]}
                 >
-                    {/* Top Row: Label + Eye toggle + "Al día" pill */}
                     <View style={styles.heroTopRow}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <Text style={styles.heroAvailableLabel}>
@@ -197,7 +206,6 @@ export default function DashboardScreen() {
                         </View>
                     </View>
 
-                    {/* Big Amount */}
                     <View style={styles.heroAmountRow}>
                         <Text style={styles.heroAmountWhole}>
                             {showBalances
@@ -207,9 +215,7 @@ export default function DashboardScreen() {
                         <Text style={styles.heroAmountCurrency}> {currencySymbol}</Text>
                     </View>
 
-                    {/* Sub-metrics Cards Grid */}
                     <View style={styles.heroSubMetricsGrid}>
-                        {/* Incomes */}
                         <View style={styles.subMetricCard}>
                             <View style={styles.subMetricHeader}>
                                 <Ionicons
@@ -226,7 +232,6 @@ export default function DashboardScreen() {
                             </Text>
                         </View>
 
-                        {/* Expenses */}
                         <View style={styles.subMetricCard}>
                             <View style={styles.subMetricHeader}>
                                 <Ionicons
@@ -245,7 +250,6 @@ export default function DashboardScreen() {
                     </View>
                 </View>
 
-                {/* ── 3. Envelope Budgets Section ("Presupuestos") ─── */}
                 <View style={styles.sectionHeaderRow}>
                     <View style={styles.sectionTitleWithBadge}>
                         <Text style={[styles.sectionTitle, { color: c.text }]}>
@@ -391,7 +395,6 @@ export default function DashboardScreen() {
                                         </View>
                                     </View>
 
-                                    {/* Progress track */}
                                     <View
                                         style={[
                                             styles.budgetTrack,
@@ -438,7 +441,6 @@ export default function DashboardScreen() {
                     </Pressable>
                 )}
 
-                {/* ── 4. Savings Goal Section ("Huchas") ────────────── */}
                 <View style={[styles.sectionHeaderRow, { marginTop: spacing.lg }]}>
                     <Text style={[styles.sectionTitle, { color: c.text }]}>
                         Huchas
@@ -470,7 +472,6 @@ export default function DashboardScreen() {
                             })
                         }
                     >
-                        {/* Circular Progress Ring */}
                         <View style={styles.circleProgressWrap}>
                             <Svg width="54" height="54" viewBox="0 0 54 54">
                                 <Circle
@@ -499,7 +500,6 @@ export default function DashboardScreen() {
                             </Text>
                         </View>
 
-                        {/* Goal info */}
                         <View style={styles.goalInfoCol}>
                             <View style={styles.goalTitleRow}>
                                 <Text
@@ -526,7 +526,6 @@ export default function DashboardScreen() {
                             </Text>
                         </View>
 
-                        {/* Quick action button (+) */}
                         <Pressable
                             style={[
                                 styles.goalActionBtn,
@@ -568,7 +567,6 @@ export default function DashboardScreen() {
                     </Pressable>
                 )}
 
-                {/* ── 5. Recent Transactions Section ("Últimos movimientos") */}
                 <View style={[styles.sectionHeaderRow, { marginTop: spacing.lg }]}>
                     <Text style={[styles.sectionTitle, { color: c.text }]}>
                         Últimos movimientos
@@ -622,7 +620,6 @@ export default function DashboardScreen() {
                                         })
                                     }
                                 >
-                                    {/* Category Icon */}
                                     <View
                                         style={[
                                             styles.txIconAvatar,
@@ -638,7 +635,6 @@ export default function DashboardScreen() {
                                         </Text>
                                     </View>
 
-                                    {/* Info: Note + Date/Category */}
                                     <View style={styles.txInfoCol}>
                                         <Text
                                             style={[styles.txTitleText, { color: c.text }]}
@@ -660,7 +656,6 @@ export default function DashboardScreen() {
                                         </Text>
                                     </View>
 
-                                    {/* Amount */}
                                     <Text
                                         style={[
                                             styles.txAmountText,

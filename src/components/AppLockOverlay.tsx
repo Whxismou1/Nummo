@@ -33,7 +33,6 @@ export function AppLockOverlay() {
     return (
         <Modal visible={isLocked} animationType="fade" transparent={false}>
             <View style={[styles.container, { backgroundColor: c.background }]}>
-                {/* Ambient glow */}
                 <View style={[styles.glow, { backgroundColor: c.primary }]} />
 
                 <View style={styles.content}>

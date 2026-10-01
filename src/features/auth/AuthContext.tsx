@@ -25,7 +25,6 @@ async function verifyLocalPassword(input: string, stored: string | null): Promis
     return stored === hashed;
 }
 
-// Safely configure Native Google Sign-In only if binary module is present (standalone APK)
 let GoogleSignin: any = null;
 let statusCodes: any = {};
 
@@ -86,7 +85,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Ensure user table / session table / flags exist
 try {
     conn.execSync(`
         CREATE TABLE IF NOT EXISTS users (
@@ -108,7 +106,6 @@ try {
         );
     `);
 
-    // Migrate any legacy app_user into users if exists
     try {
         const legacyRows = conn.getAllSync<{
             id: string;
@@ -126,7 +123,6 @@ try {
         }
     } catch {}
 
-    // Ensure session is cleared on the v3 reset flag so app starts at login once
     const resetFlag = conn.getFirstSync<{ value: string }>(
         "SELECT value FROM app_flags WHERE key = 'auth_initial_reset_v3'"
     );
@@ -191,7 +187,6 @@ function getStoredUser(): UserProfile | null {
             };
         }
 
-        // Active session exists; provide basic profile until cloud re-hydrates
         return {
             id: session.user_id,
             name: "Usuario",
@@ -227,7 +222,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const appState = useRef(AppState.currentState);
 
-    // Check hardware and load biometrics setting
     useEffect(() => {
         let mounted = true;
 
@@ -243,14 +237,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (mounted) setBiometricTypeLabel("biométrico");
                 }
 
-                // Check stored preference
                 let storedBio = false;
                 if (Platform.OS !== "web") {
                     try {
                         const val = await SecureStore.getItemAsync(BIOMETRICS_KEY);
                         storedBio = val === "true";
                     } catch {
-                        // fallback to SQLite settings
                         const row = conn.getFirstSync<{ value: string }>(
                             "SELECT value FROM app_settings WHERE key = ?",
                             [BIOMETRICS_KEY]
@@ -265,7 +257,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     if (!currentUser) {
                         setIsLocked(false);
                     } else if (storedBio && (!hasHardware || !isEnrolled)) {
-                        // Device no longer has biometrics enrolled
                         setIsLocked(false);
                     } else if (storedBio) {
                         setIsLocked(true);
@@ -285,7 +276,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // Unlock function
     const unlockApp = useCallback(async (): Promise<boolean> => {
         try {
             if (!hasBiometricsHardware) {
@@ -314,7 +304,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [hasBiometricsHardware, biometricsEnabled]);
 
-    // Handle AppState (lock app when going to background and returning)
     useEffect(() => {
         if (!biometricsEnabled || !user) return;
 
@@ -336,7 +325,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, [biometricsEnabled, user, unlockApp]);
 
-    // Listen to Supabase Auth State changes & sync session
     useEffect(() => {
         if (!isSupabaseConfigured()) return;
 
@@ -405,10 +393,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
-    // Google Sign-In: Native Google Play Services with Web OAuth fallback
     const loginWithGoogle = async (account?: { name: string; email: string; avatarUrl?: string }) => {
         if (!isSupabaseConfigured()) {
-            // Local fallback simulation if Supabase is not configured
             const selectedName = account?.name || "Usuario";
             const selectedEmail = (account?.email || "usuario@gmail.com").trim().toLowerCase();
             const existing = conn.getFirstSync<{
@@ -455,11 +441,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // 1. Try Native Google Sign-In first (Official Android bottom sheet)
         try {
             if (GoogleSignin && typeof GoogleSignin.signIn === "function") {
                 await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-                // Force Google account picker dialog by clearing any cached native account
                 try {
                     await GoogleSignin.signOut();
                 } catch {}
@@ -501,7 +485,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
         } catch (nativeErr: any) {
-            // User cancelled native dialog
             if (
                 nativeErr?.code === statusCodes?.SIGN_IN_CANCELLED ||
                 nativeErr?.message?.includes("cancelled") ||
@@ -515,7 +498,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
-        // 2. Fallback to Web OAuth (in Expo Go or if native unavailable)
         const redirectUrl = Linking.createURL("auth");
 
         const { data, error } = await supabase.auth.signInWithOAuth({
@@ -608,7 +590,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Validate credentials before sending verification code
     const validateCredentials = async (
         email: string,
         password?: string,
@@ -616,7 +597,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ): Promise<{ ok: boolean; error?: string }> => {
         const normEmail = email.trim().toLowerCase();
 
-        // If Supabase is configured, Supabase validates credentials during signUp / signInWithPassword
         if (isSupabaseConfigured()) {
             return { ok: true };
         }
@@ -635,7 +615,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return { ok: true };
         }
 
-        // Login flow: check account exists in SQLite fallback
         const row = conn.getFirstSync<{ id: string; password: string | null }>(
             "SELECT id, password FROM users WHERE email = ? LIMIT 1",
             [normEmail]
@@ -661,7 +640,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
     };
 
-    // Email Sign-In
     const loginWithEmail = async (email: string, password?: string) => {
         const normEmail = email.trim().toLowerCase();
 
@@ -693,7 +671,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // SQLite Local Fallback
         const row = conn.getFirstSync<{
             id: string;
             name: string;
@@ -731,7 +708,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(profile);
     };
 
-    // Register
     const register = async (name: string, email: string, password?: string) => {
         const normEmail = email.trim().toLowerCase();
 
@@ -748,7 +724,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 throw new Error(error.message);
             }
 
-            // Supabase returns an empty identities array if user is already registered
             if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
                 throw new Error("User already registered");
             }
@@ -768,7 +743,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // SQLite Local Fallback
         const existing = conn.getFirstSync<{ id: string }>(
             "SELECT id FROM users WHERE email = ? LIMIT 1",
             [normEmail]
@@ -801,7 +775,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(newUser);
     };
 
-    // Verify OTP code (works for Supabase email code verification)
     const verifyOtp = async (email: string, token: string, type: "signup" | "email" | "recovery" = "signup") => {
         const normEmail = email.trim().toLowerCase();
         if (isSupabaseConfigured()) {
@@ -833,7 +806,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Reset password: sends reset code to email
     const resetPasswordForEmail = async (email: string) => {
         const normEmail = email.trim().toLowerCase();
         if (isSupabaseConfigured()) {
@@ -842,7 +814,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Local SQLite check
         const row = conn.getFirstSync<{ id: string }>(
             "SELECT id FROM users WHERE email = ? LIMIT 1",
             [normEmail]
@@ -852,7 +823,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Update password with verified recovery code
     const updatePasswordWithOtp = async (email: string, token: string, newPassword: string) => {
         const normEmail = email.trim().toLowerCase();
         if (isSupabaseConfigured()) {
@@ -889,7 +859,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Local SQLite fallback
         const row = conn.getFirstSync<{ id: string }>(
             "SELECT id FROM users WHERE email = ? LIMIT 1",
             [normEmail]
@@ -924,7 +893,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Logout: Clears the active session and cached local data to prevent cross-account leaks
     const logout = async () => {
         if (GoogleSignin && typeof GoogleSignin.signOut === "function") {
             try {
@@ -944,7 +912,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         try {
             conn.runSync("DELETE FROM app_session WHERE key = 'active_user'");
-            // Purge cached local data so it never leaks into another account
             conn.runSync("DELETE FROM transactions");
             conn.runSync("DELETE FROM budgets");
             conn.runSync("DELETE FROM savings_goals");
@@ -956,7 +923,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Toggle biometrics
     const setBiometricsEnabled = async (enabled: boolean): Promise<boolean> => {
         if (enabled) {
             const hasHw = await LocalAuthentication.hasHardwareAsync();
@@ -965,7 +931,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return false;
             }
 
-            // Verify before enabling
             const authResult = await LocalAuthentication.authenticateAsync({
                 promptMessage: "Confirma tu identidad para activar el bloqueo",
                 cancelLabel: "Cancelar",

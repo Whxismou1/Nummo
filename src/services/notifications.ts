@@ -6,6 +6,7 @@ import { getAllTransactionsForExport } from "@/features/transactions/repository"
 import { currentPeriod, formatPeriod, formatDate } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import { getAppSetting } from "@/features/settings/SettingsContext";
+import * as XLSX from "xlsx";
 
 export interface AlertEmailPayload {
     to: string;
@@ -16,19 +17,14 @@ export interface AlertEmailPayload {
     details?: { label: string; value: string }[];
 }
 
-/**
- * Sends an email notification using Supabase Edge Function (powered by Resend)
- */
 export async function sendEmailViaSupabase(payload: {
     to: string;
     subject: string;
     html: string;
+    attachments?: { filename: string; content: string }[];
 }): Promise<{ ok: boolean; error?: string }> {
-    // We invoke the server-side Supabase Edge Function so the Resend Secret Key
-    // NEVER enters the APK or client bundle (100% secure in the cloud vault).
     try {
         if (!isSupabaseConfigured()) {
-            console.warn("[Notifications] Supabase no está configurado.");
             return { ok: false, error: "Supabase no está configurado." };
         }
 
@@ -37,20 +33,15 @@ export async function sendEmailViaSupabase(payload: {
         });
 
         if (error) {
-            console.warn("[Notifications] Edge function error:", error);
             return { ok: false, error: error.message };
         }
 
         return { ok: true };
     } catch (e: any) {
-        console.warn("[Notifications] Error invoking send-email:", e);
         return { ok: false, error: e?.message || "Error al enviar correo" };
     }
 }
 
-/**
- * Sends a single alert email (e.g. Budget Exceeded or Goal Completed)
- */
 export async function sendAlertEmail(payload: AlertEmailPayload): Promise<boolean> {
     const isEmailEnabled = getAppSetting("notificationsEmail");
     if (!isEmailEnabled || !payload.to) {
@@ -125,14 +116,10 @@ export async function sendAlertEmail(payload: AlertEmailPayload): Promise<boolea
     return res.ok;
 }
 
-/**
- * Generates and sends a comprehensive, beautiful HTML Financial Report with charts & tables
- */
 export async function sendComprehensiveFinancialReport(toEmail: string): Promise<{ ok: boolean; error?: string }> {
     const period = currentPeriod();
     const periodTitle = formatPeriod(period);
 
-    // Fetch financial data in parallel
     const [summary, budgetsOverview, goals, allTxs] = await Promise.all([
         getMonthSummary(period),
         getMonthBudgetsOverview(period),
@@ -140,158 +127,98 @@ export async function sendComprehensiveFinancialReport(toEmail: string): Promise
         getAllTransactionsForExport(),
     ]);
 
-    const formattedIncome = formatMoney(summary.totalIncome);
-    const formattedExpenses = formatMoney(summary.totalExpenses);
-    const formattedBalance = formatMoney(summary.balance);
-    const isDeficit = summary.balance < 0;
+    const wb = XLSX.utils.book_new();
 
-    // Budgets rows
-    const budgetsHtml =
-        budgetsOverview.categoryBudgets.length > 0
-            ? budgetsOverview.categoryBudgets
-                  .map((b) => {
-                      const pct = Math.min(Math.round(b.percentage), 100);
-                      const barColor = b.status === "over" ? "#EF4444" : b.status === "warn" ? "#F59E0B" : "#10B981";
-                      return `
-            <div style="margin-bottom: 14px; padding: 12px; background: #F8FAFC; border-radius: 10px; border: 1px solid #E2E8F0;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-weight: 600; color: #1E293B; font-size: 14px;">${b.categoryIcon || "🏷️"} ${b.categoryName || "Sobre"}</span>
-                <span style="font-size: 13px; font-weight: bold; color: ${barColor};">${formatMoney(b.spentAmount)} / ${formatMoney(b.limitAmount)} (${Math.round(b.percentage)}%)</span>
-              </div>
-              <div style="background: #E2E8F0; height: 8px; border-radius: 4px; overflow: hidden;">
-                <div style="background: ${barColor}; height: 8px; width: ${pct}%;"></div>
-              </div>
-            </div>`;
-                  })
-                  .join("")
-            : `<p style="color: #64748B; font-size: 14px; font-style: italic;">No tienes sobres de gasto configurados en este periodo.</p>`;
+    const wsResumen = XLSX.utils.aoa_to_sheet([
+        ["INFORME FINANCIERO NUMMO"],
+        [`Periodo: ${periodTitle}`],
+        [],
+        ["Concepto", "Importe"],
+        ["Ingresos totales", formatMoney(summary.totalIncome)],
+        ["Gastos totales", formatMoney(summary.totalExpenses)],
+        ["Balance", formatMoney(summary.balance)],
+        [],
+        ["Total presupuestado", formatMoney(budgetsOverview.totalBudgeted)],
+        ["Total gastado (presupuestos)", formatMoney(budgetsOverview.totalSpent)]
+    ]);
+    wsResumen["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+    wsResumen["!cols"] = [{ wch: 30 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
 
-    // Goals rows
-    const goalsHtml =
-        goals.length > 0
-            ? goals
-                  .map((g) => {
-                      const pct = g.percentage ? Math.min(Math.round(g.percentage), 100) : 100;
-                      return `
-            <div style="margin-bottom: 14px; padding: 12px; background: #F8FAFC; border-radius: 10px; border: 1px solid #E2E8F0;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-weight: 600; color: #1E293B; font-size: 14px;">${g.icon || "🐖"} ${g.name}</span>
-                <span style="font-size: 13px; font-weight: bold; color: #6366F1;">${formatMoney(g.savedAmount)}${g.targetAmount ? ` de ${formatMoney(g.targetAmount)}` : ""}</span>
-              </div>
-              <div style="background: #E2E8F0; height: 8px; border-radius: 4px; overflow: hidden;">
-                <div style="background: #6366F1; height: 8px; width: ${pct}%;"></div>
-              </div>
-            </div>`;
-                  })
-                  .join("")
-            : `<p style="color: #64748B; font-size: 14px; font-style: italic;">Aún no has creado huchas de ahorro.</p>`;
+    const txData = [
+        ["Fecha", "Tipo", "Categoría", "Nota", "Importe"],
+        ...allTxs.map(tx => [
+            formatDate(tx.date),
+            tx.type === "income" ? "Ingreso" : "Gasto",
+            tx.category?.name || "Sin categoría",
+            tx.note || "-",
+            (tx.type === "expense" ? "-" : "") + formatMoney(tx.amount)
+        ])
+    ];
+    const wsMovimientos = XLSX.utils.aoa_to_sheet(txData);
+    wsMovimientos["!cols"] = [{ wch: 18 }, { wch: 12 }, { wch: 20 }, { wch: 30 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, wsMovimientos, "Movimientos");
 
-    // Recent movements (last 15)
-    const recentTxs = allTxs.slice(0, 15);
-    const txRowsHtml =
-        recentTxs.length > 0
-            ? recentTxs
-                  .map((tx) => {
-                      const isExp = tx.type === "expense";
-                      const color = isExp ? "#0F172A" : "#10B981";
-                      const sign = isExp ? "−" : "+";
-                      return `
-            <tr style="border-bottom: 1px solid #F1F5F9;">
-              <td style="padding: 10px 8px; font-size: 13px; color: #64748B;">${formatDate(tx.date)}</td>
-              <td style="padding: 10px 8px; font-size: 13px; font-weight: 500; color: #1E293B;">${tx.category?.name || "Sin categoría"}</td>
-              <td style="padding: 10px 8px; font-size: 13px; color: #475569;">${tx.note || "-"}</td>
-              <td style="padding: 10px 8px; font-size: 13px; font-weight: bold; color: ${color}; text-align: right;">${sign}${formatMoney(tx.amount)}</td>
-            </tr>`;
-                  })
-                  .join("")
-            : `<tr><td colspan="4" style="padding: 12px; text-align: center; color: #94A3B8;">Sin movimientos</td></tr>`;
+    const budgetsData = [
+        ["Categoría", "Límite", "Gastado", "Restante", "% Uso", "Estado"]
+    ];
+    if (budgetsOverview.globalBudget) {
+        const gb = budgetsOverview.globalBudget;
+        budgetsData.push([
+            "Presupuesto Global",
+            formatMoney(gb.limitAmount),
+            formatMoney(gb.spentAmount),
+            formatMoney(gb.remainingAmount),
+            `${Math.round(gb.percentage)}%`,
+            gb.status === "ok" ? "OK" : gb.status === "warn" ? "Alerta" : "Excedido"
+        ]);
+    }
+    budgetsOverview.categoryBudgets.forEach(b => {
+        budgetsData.push([
+            `${b.categoryIcon || ''} ${b.categoryName || 'Global'}`.trim(),
+            formatMoney(b.limitAmount),
+            formatMoney(b.spentAmount),
+            formatMoney(b.remainingAmount),
+            `${Math.round(b.percentage)}%`,
+            b.status === "ok" ? "OK" : b.status === "warn" ? "Alerta" : "Excedido"
+        ]);
+    });
+    const wsPresupuestos = XLSX.utils.aoa_to_sheet(budgetsData);
+    wsPresupuestos["!cols"] = [{ wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsPresupuestos, "Presupuestos");
 
-    const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Informe Financiero Nummo - ${periodTitle}</title>
-    </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F1F5F9; margin: 0; padding: 24px;">
-      <div style="max-width: 650px; margin: 0 auto; background: #FFFFFF; border-radius: 20px; overflow: hidden; border: 1px solid #E2E8F0; box-shadow: 0 8px 24px rgba(0,0,0,0.06);">
-        
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #1E1B4B 0%, #312E81 100%); padding: 32px 24px; text-align: center;">
-          <h1 style="color: #FFFFFF; margin: 0; font-size: 26px; font-weight: bold; letter-spacing: -0.5px;">Nummo</h1>
-          <p style="color: #C7D2FE; margin: 6px 0 0 0; font-size: 15px;">Informe Financiero Mensual · ${periodTitle}</p>
-        </div>
+    const goalsData = [
+        ["Nombre", "Ahorrado", "Meta", "Restante", "% Completado", "Estado"],
+        ...goals.map(g => [
+            `${g.icon || ''} ${g.name}`.trim(),
+            formatMoney(g.savedAmount),
+            g.targetAmount ? formatMoney(g.targetAmount) : "Sin límite",
+            g.remainingAmount !== null ? formatMoney(g.remainingAmount) : "0",
+            g.percentage !== null ? `${Math.round(g.percentage)}%` : "∞",
+            g.isCompleted ? "Completada" : "En progreso"
+        ])
+    ];
+    const wsHuchas = XLSX.utils.aoa_to_sheet(goalsData);
+    wsHuchas["!cols"] = [{ wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, wsHuchas, "Huchas");
 
-        <div style="padding: 28px;">
-          <!-- 3 Metric Cards -->
-          <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-bottom: 24px;">
-            <tr>
-              <td style="width: 33%; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; text-align: center;">
-                <div style="font-size: 11px; font-weight: bold; color: #10B981; text-transform: uppercase;">Ingresos</div>
-                <div style="font-size: 18px; font-weight: bold; color: #0F172A; margin-top: 4px;">${formattedIncome}</div>
-              </td>
-              <td style="width: 33%; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 14px; text-align: center;">
-                <div style="font-size: 11px; font-weight: bold; color: #EF4444; text-transform: uppercase;">Gastos</div>
-                <div style="font-size: 18px; font-weight: bold; color: #0F172A; margin-top: 4px;">${formattedExpenses}</div>
-              </td>
-              <td style="width: 33%; background: ${isDeficit ? "#FEF2F2" : "#EFF6FF"}; border: 1px solid ${isDeficit ? "#FCA5A5" : "#BFDBFE"}; border-radius: 12px; padding: 14px; text-align: center;">
-                <div style="font-size: 11px; font-weight: bold; color: ${isDeficit ? "#DC2626" : "#2563EB"}; text-transform: uppercase;">Balance</div>
-                <div style="font-size: 18px; font-weight: bold; color: ${isDeficit ? "#DC2626" : "#1D4ED8"}; margin-top: 4px;">${formattedBalance}</div>
-              </td>
-            </tr>
-          </table>
-
-          <!-- Section: Presupuestos -->
-          <h3 style="color: #0F172A; font-size: 16px; margin: 24px 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid #F1F5F9;">
-            📊 Estado de Presupuestos (${periodTitle})
-          </h3>
-          ${budgetsHtml}
-
-          <!-- Section: Huchas de Ahorro -->
-          <h3 style="color: #0F172A; font-size: 16px; margin: 28px 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid #F1F5F9;">
-            🎯 Huchas de Ahorro
-          </h3>
-          ${goalsHtml}
-
-          <!-- Section: Movimientos Recientes -->
-          <h3 style="color: #0F172A; font-size: 16px; margin: 28px 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid #F1F5F9;">
-            📝 Últimos Movimientos
-          </h3>
-          <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
-            <thead>
-              <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
-                <th style="padding: 8px; text-align: left; font-size: 11px; color: #64748B; text-transform: uppercase;">Fecha</th>
-                <th style="padding: 8px; text-align: left; font-size: 11px; color: #64748B; text-transform: uppercase;">Categoría</th>
-                <th style="padding: 8px; text-align: left; font-size: 11px; color: #64748B; text-transform: uppercase;">Nota</th>
-                <th style="padding: 8px; text-align: right; font-size: 11px; color: #64748B; text-transform: uppercase;">Importe</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${txRowsHtml}
-            </tbody>
-          </table>
-
-          <!-- Footer note -->
-          <div style="margin-top: 32px; padding: 16px; background: #F8FAFC; border-radius: 12px; text-align: center; border: 1px solid #E2E8F0;">
-            <p style="margin: 0; font-size: 12px; color: #64748B;">
-              🔒 Informe generado de forma segura desde Nummo. Cifrado local · Offline First.
-            </p>
-          </div>
-        </div>
-
-        <div style="background-color: #F1F5F9; padding: 16px; text-align: center; border-top: 1px solid #E2E8F0;">
-          <p style="margin: 0; font-size: 11px; color: #94A3B8;">
-            Nummo · Gestión financiera privada · Puedes gestionar tus preferencias en cualquier momento desde la app.
-          </p>
-        </div>
-      </div>
-    </body>
-    </html>
-    `;
+    const base64String = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
 
     return sendEmailViaSupabase({
         to: toEmail,
-        subject: `📊 Informe Financiero Nummo - ${periodTitle}`,
-        html,
+        subject: `Informe Financiero Nummo - ${periodTitle}`,
+        html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+        </head>
+        <body style="font-family: sans-serif; padding: 24px; color: #0F172A;">
+          <h2>Nummo</h2>
+          <p>Adjunto encontrarás tu informe financiero mensual de Nummo.</p>
+        </body>
+        </html>
+        `,
+        attachments: [{ filename: `informe_nummo_${period}.xlsx`, content: base64String }]
     });
 }

@@ -5,23 +5,19 @@ import { newId } from "@/lib/id";
 import { and, between, desc, eq, sql } from "drizzle-orm";
 import { syncTransactionToCloud, deleteTransactionFromCloud } from "@/services/sync";
 
-// ── Types ────────────────────────────────────────────────────────────
 
 type TransactionInput = Omit<NewTransaction, "id">;
 
-/** Transaction enriched with its category data (null if uncategorized) */
 export type TransactionWithCategory = Transaction & {
     category: Category | null;
 };
 
-/** Monthly summary: total income, total expenses, balance */
 export type MonthSummary = {
     totalIncome: number;
     totalExpenses: number;
     balance: number;
 };
 
-// ── CRUD ─────────────────────────────────────────────────────────────
 
 export const createTransaction = async (
     trans: TransactionInput,
@@ -88,12 +84,7 @@ export const deleteTransaction = async (id: string): Promise<void> => {
     void deleteTransactionFromCloud(id);
 };
 
-// ── Queries ──────────────────────────────────────────────────────────
 
-/**
- * Returns all transactions for the given period (YYYY-MM) ordered by date desc,
- * each enriched with its category data.
- */
 export const getTransactionsForPeriod = async (
     period: string,
 ): Promise<TransactionWithCategory[]> => {
@@ -126,10 +117,6 @@ export const getTransactionsForPeriod = async (
     return rows.map(mapRowToTransactionWithCategory);
 };
 
-/**
- * Synchronously returns all transactions for the given period (YYYY-MM) ordered by date desc.
- * Allows zero-latency, zero-flash instant UI rendering on screen mount.
- */
 export const getTransactionsForPeriodSync = (
     period: string,
 ): TransactionWithCategory[] => {
@@ -153,10 +140,6 @@ export const getTransactionsForPeriodSync = (
     }
 };
 
-/**
- * Calculates total income, total expenses, and balance for a given period.
- * Amounts are in cents.
- */
 export const getMonthSummary = async (
     period: string,
 ): Promise<MonthSummary> => {
@@ -181,9 +164,6 @@ export const getMonthSummary = async (
     };
 };
 
-/**
- * Synchronous version of getMonthSummary for instant zero-flash render.
- */
 export const getMonthSummarySync = (
     period: string,
 ): MonthSummary => {
@@ -210,10 +190,6 @@ export const getMonthSummarySync = (
     }
 };
 
-/**
- * Returns all transactions ever recorded, ordered by date desc.
- * Used for CSV / JSON exports.
- */
 export const getAllTransactionsForExport = async (): Promise<TransactionWithCategory[]> => {
     const rows = await db
         .select({
@@ -240,7 +216,6 @@ export const getAllTransactionsForExport = async (): Promise<TransactionWithCate
     return rows.map(mapRowToTransactionWithCategory);
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapRowToTransactionWithCategory(row: any): TransactionWithCategory {

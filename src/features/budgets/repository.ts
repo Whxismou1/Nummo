@@ -5,7 +5,6 @@ import { monthEnd, monthStart } from "@/lib/date";
 import { and, between, eq, sql } from "drizzle-orm";
 import { syncBudgetToCloud, deleteBudgetFromCloud } from "@/services/sync";
 
-// ── Types ────────────────────────────────────────────────────────────
 
 export interface BudgetWithCategory extends Budget {
     category: Category | null;
@@ -34,7 +33,6 @@ export interface MonthBudgetsOverview {
     totalSpent: number;
 }
 
-// ── Queries ──────────────────────────────────────────────────────────
 
 export async function getBudgetsForPeriod(
     period: string,
@@ -123,20 +121,14 @@ export async function getBudgetById(
     };
 }
 
-/**
- * Calculates real-time progress for all budgets in a given period.
- * Aggregates actual expenses from transactions and compares against limits.
- */
 export async function getMonthBudgetsOverview(
     period: string,
 ): Promise<MonthBudgetsOverview> {
     const start = monthStart(period);
     const end = monthEnd(period);
 
-    // 1. Fetch all budgets configured for this month
     const configuredBudgets = await getBudgetsForPeriod(period);
 
-    // 2. Aggregate expenses for the whole month (for global budget)
     const [totalExpenseResult] = await db
         .select({
             total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)`,
@@ -150,7 +142,6 @@ export async function getMonthBudgetsOverview(
         );
     const totalSpentMonth = Number(totalExpenseResult?.total ?? 0);
 
-    // 3. Aggregate expenses grouped by category
     const categoryExpenses = await db
         .select({
             categoryId: transactions.categoryId,
@@ -172,7 +163,6 @@ export async function getMonthBudgetsOverview(
         }
     }
 
-    // 4. Map into BudgetProgress objects
     let globalBudget: BudgetProgress | null = null;
     const categoryBudgets: BudgetProgress[] = [];
 
@@ -221,7 +211,6 @@ export async function getMonthBudgetsOverview(
         }
     }
 
-    // Sort category budgets: over-budget first, then warn, then ok
     categoryBudgets.sort((a, b) => b.percentage - a.percentage);
 
     const totalBudgeted = categoryBudgets.reduce(
@@ -238,7 +227,6 @@ export async function getMonthBudgetsOverview(
     };
 }
 
-// ── Mutations ────────────────────────────────────────────────────────
 
 export async function createBudget(data: {
     period: string;
@@ -248,7 +236,6 @@ export async function createBudget(data: {
 }): Promise<Budget> {
     const categoryId = data.scope === "category" ? (data.categoryId ?? null) : null;
 
-    // Check if a budget already exists for this scope/category/period
     const existing = await db
         .select()
         .from(budgets)
@@ -264,7 +251,6 @@ export async function createBudget(data: {
         .limit(1);
 
     if (existing.length > 0) {
-        // Update existing instead of creating duplicate
         const [updated] = await db
             .update(budgets)
             .set({ amount: data.amount })
