@@ -9,6 +9,7 @@ import { useCallback, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Modal,
     Pressable,
     SectionList,
     StyleSheet,
@@ -20,6 +21,12 @@ import { Ionicons } from "@expo/vector-icons";
 import type { TransactionWithCategory } from "@/features/transactions/repository";
 import { useAppSettings } from "@/features/settings/SettingsContext";
 
+const MONTH_NAMES = [
+    "Ene", "Feb", "Mar", "Abr",
+    "May", "Jun", "Jul", "Ago",
+    "Sep", "Oct", "Nov", "Dic",
+];
+
 export default function TransactionsScreen() {
     const { colors: c } = useTheme();
     const { currency, hideBalances } = useAppSettings();
@@ -28,6 +35,7 @@ export default function TransactionsScreen() {
 
     const {
         period,
+        setPeriod,
         goToPrevMonth,
         goToNextMonth,
         goToCurrentMonth,
@@ -39,6 +47,8 @@ export default function TransactionsScreen() {
     } = useTransactions();
     const router = useRouter();
 
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
+    const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
     const [filter, setFilter] = useState<"all" | "expense" | "income">("all");
 
     useFocusEffect(
@@ -89,16 +99,30 @@ export default function TransactionsScreen() {
     const listHeader = useMemo(
         () => (
             <View style={styles.headerContainer}>
-                <View style={styles.titleRow}>
+                <View style={styles.headerTop}>
                     <Text style={styles.title}>Movimientos</Text>
+                </View>
+
+                <View style={styles.headerActions}>
                     <View style={styles.periodSelectorContainer}>
                         <Pressable onPress={goToPrevMonth} hitSlop={10} style={styles.periodArrow}>
                             <Ionicons name="chevron-back" size={18} color={c.text} />
                         </Pressable>
-                        <View style={styles.monthPill}>
-                            <Ionicons name="calendar-outline" size={14} color={c.primary} />
-                            <Text style={styles.monthPillText}>{formatPeriod(period)}</Text>
-                        </View>
+
+                        <Pressable
+                            style={styles.periodPill}
+                            onPress={() => {
+                                const y = parseInt(period.split("-")[0], 10) || new Date().getFullYear();
+                                setPickerYear(y);
+                                setShowMonthPicker(true);
+                            }}
+                            hitSlop={6}
+                        >
+                            <Ionicons name="calendar-outline" size={16} color={c.primary} />
+                            <Text style={styles.periodText}>{formatPeriod(period)}</Text>
+                            <Ionicons name="chevron-down" size={13} color={c.textMuted} />
+                        </Pressable>
+
                         <Pressable
                             onPress={goToNextMonth}
                             hitSlop={10}
@@ -112,6 +136,14 @@ export default function TransactionsScreen() {
                             />
                         </Pressable>
                     </View>
+
+                    <Pressable
+                        style={[styles.todayBtn, { backgroundColor: c.surface, borderColor: c.border }]}
+                        onPress={goToCurrentMonth}
+                        hitSlop={8}
+                    >
+                        <Text style={[styles.todayBtnText, { color: c.primary }]}>Hoy</Text>
+                    </Pressable>
                 </View>
 
                 <View style={styles.summaryCard}>
@@ -216,7 +248,7 @@ export default function TransactionsScreen() {
                 </View>
             </View>
         ),
-        [styles, period, goToPrevMonth, goToNextMonth, c, hideBalances, summary, currency, filter, counts]
+        [styles, period, goToPrevMonth, goToNextMonth, goToCurrentMonth, c, hideBalances, summary, currency, filter, counts]
     );
 
     const listEmpty = useMemo(() => {
@@ -336,6 +368,96 @@ export default function TransactionsScreen() {
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
             />
+
+            <Modal
+                visible={showMonthPicker}
+                animationType="fade"
+                transparent
+                onRequestClose={() => setShowMonthPicker(false)}
+            >
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setShowMonthPicker(false)}
+                >
+                    <Pressable
+                        style={[
+                            styles.pickerDialog,
+                            { backgroundColor: c.surface, borderColor: c.border },
+                        ]}
+                        onPress={(e) => e.stopPropagation()}
+                    >
+                        <View style={styles.pickerYearRow}>
+                            <Pressable
+                                onPress={() => setPickerYear((y) => y - 1)}
+                                style={[styles.yearArrow, { backgroundColor: c.track }]}
+                                hitSlop={10}
+                            >
+                                <Ionicons name="chevron-back" size={18} color={c.text} />
+                            </Pressable>
+                            <Text style={[styles.pickerYearText, { color: c.text }]}>
+                                {pickerYear}
+                            </Text>
+                            <Pressable
+                                onPress={() => setPickerYear((y) => y + 1)}
+                                style={[styles.yearArrow, { backgroundColor: c.track }]}
+                                hitSlop={10}
+                            >
+                                <Ionicons name="chevron-forward" size={18} color={c.text} />
+                            </Pressable>
+                        </View>
+
+                        <View style={styles.monthsGrid}>
+                            {MONTH_NAMES.map((mName, idx) => {
+                                const mNum = String(idx + 1).padStart(2, "0");
+                                const pKey = `${pickerYear}-${mNum}`;
+                                const isSelected = pKey === period;
+                                return (
+                                    <Pressable
+                                        key={mName}
+                                        style={[
+                                            styles.monthItemBtn,
+                                            {
+                                                backgroundColor: isSelected
+                                                    ? c.primary
+                                                    : c.track,
+                                            },
+                                        ]}
+                                        onPress={() => {
+                                            setPeriod(pKey);
+                                            setShowMonthPicker(false);
+                                        }}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.monthItemText,
+                                                {
+                                                    color: isSelected
+                                                        ? "#FFFFFF"
+                                                        : c.text,
+                                                    fontWeight: isSelected
+                                                        ? fontWeight.bold
+                                                        : fontWeight.medium,
+                                                },
+                                            ]}
+                                        >
+                                            {mName}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
+                        </View>
+
+                        <Pressable
+                            style={[styles.pickerCloseBtn, { backgroundColor: c.track }]}
+                            onPress={() => setShowMonthPicker(false)}
+                        >
+                            <Text style={[styles.pickerCloseText, { color: c.text }]}>
+                                Cerrar
+                            </Text>
+                        </Pressable>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
@@ -359,11 +481,8 @@ const createStyles = (c: ReturnType<typeof import("@/theme").useTheme>["colors"]
             paddingHorizontal: spacing.lg,
             marginBottom: spacing.sm,
         },
-        titleRow: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: spacing.lg,
+        headerTop: {
+            marginBottom: spacing.xs,
             marginTop: spacing.sm,
         },
         title: {
@@ -371,15 +490,26 @@ const createStyles = (c: ReturnType<typeof import("@/theme").useTheme>["colors"]
             fontWeight: fontWeight.bold,
             color: c.text,
         },
+        headerActions: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: spacing.md,
+            gap: spacing.sm,
+        },
         periodSelectorContainer: {
             flexDirection: "row",
             alignItems: "center",
-            gap: 4,
+            gap: spacing.xs,
         },
         periodArrow: {
-            padding: 4,
+            padding: spacing.xs,
+            backgroundColor: c.surface,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: c.border,
         },
-        monthPill: {
+        periodPill: {
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: c.surface,
@@ -388,12 +518,91 @@ const createStyles = (c: ReturnType<typeof import("@/theme").useTheme>["colors"]
             borderRadius: 999,
             borderWidth: 1,
             borderColor: c.border,
-            gap: spacing.xs,
+            gap: spacing.xs + 2,
         },
-        monthPillText: {
+        periodText: {
             fontSize: fontSize.body,
-            fontWeight: fontWeight.medium,
+            fontWeight: fontWeight.semibold,
             color: c.text,
+            textTransform: "capitalize",
+        },
+        todayBtn: {
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+            borderRadius: 999,
+            borderWidth: 1,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        todayBtnText: {
+            fontSize: fontSize.caption + 1,
+            fontWeight: fontWeight.bold,
+        },
+        modalOverlay: {
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: spacing.lg,
+        },
+        pickerDialog: {
+            width: "100%",
+            maxWidth: 340,
+            borderRadius: 24,
+            borderWidth: 1,
+            padding: spacing.lg,
+            gap: spacing.md,
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.25,
+            shadowRadius: 10,
+        },
+        pickerYearRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: spacing.xs,
+        },
+        yearArrow: {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        pickerYearText: {
+            fontSize: fontSize.subtitle,
+            fontWeight: fontWeight.bold,
+        },
+        monthsGrid: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: spacing.xs + 2,
+            justifyContent: "space-between",
+        },
+        monthItemBtn: {
+            width: "31%",
+            paddingVertical: 12,
+            borderRadius: 14,
+            alignItems: "center",
+            justifyContent: "center",
+            marginVertical: 2,
+        },
+        monthItemText: {
+            fontSize: fontSize.caption + 1,
+            fontWeight: fontWeight.semibold,
+        },
+        pickerCloseBtn: {
+            paddingVertical: 10,
+            borderRadius: 14,
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: spacing.xs,
+        },
+        pickerCloseText: {
+            fontSize: fontSize.caption + 1,
+            fontWeight: fontWeight.semibold,
         },
         summaryCard: {
             backgroundColor: c.surface,
