@@ -1,7 +1,7 @@
 {
   "name": "nummo",
   "main": "expo-router/entry",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -53,6 +53,7 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1",
     "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {

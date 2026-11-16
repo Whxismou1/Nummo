@@ -158,9 +158,15 @@ export default function BudgetsScreen() {
                             }}
                             hitSlop={6}
                         >
-                            <Ionicons name="calendar-outline" size={16} color={c.primary} />
-                            <Text style={styles.periodText}>{formatPeriod(period)}</Text>
-                            <Ionicons name="chevron-down" size={13} color={c.textMuted} />
+                            <Ionicons name="calendar-outline" size={15} color={c.primary} />
+                            <Text
+                                style={styles.periodText}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.75}
+                            >
+                                {formatPeriod(period)}
+                            </Text>
                         </Pressable>
 
                         <Pressable onPress={goToNextMonth} hitSlop={10} style={styles.periodArrow}>
@@ -481,28 +487,35 @@ const createStyles = (c: any, insets: any) =>
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
+            gap: spacing.sm,
         },
         periodSelectorContainer: {
+            flex: 1,
             flexDirection: "row",
             alignItems: "center",
-            gap: spacing.sm,
+            gap: spacing.xs,
+            minWidth: 0,
         },
         periodPill: {
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: c.surface,
-            paddingHorizontal: spacing.md,
+            paddingHorizontal: spacing.sm,
             paddingVertical: spacing.sm,
             borderRadius: 999,
-            gap: spacing.sm,
+            gap: spacing.xs,
             borderWidth: 1,
             borderColor: c.border,
+            flex: 1,
+            justifyContent: "center",
+            minWidth: 0,
         },
         periodText: {
             fontSize: fontSize.body,
             fontWeight: fontWeight.semibold,
             color: c.text,
             textTransform: "capitalize",
+            flexShrink: 1,
         },
         periodArrow: {
             padding: spacing.xs,
@@ -510,6 +523,7 @@ const createStyles = (c: any, insets: any) =>
             borderRadius: 999,
             borderWidth: 1,
             borderColor: c.border,
+            flexShrink: 0,
         },
         addButtonCircle: {
             width: 44,
@@ -518,6 +532,7 @@ const createStyles = (c: any, insets: any) =>
             backgroundColor: c.primary,
             justifyContent: "center",
             alignItems: "center",
+            flexShrink: 0,
         },
         todayBtn: {
             paddingHorizontal: spacing.sm + 4,
@@ -526,6 +541,7 @@ const createStyles = (c: any, insets: any) =>
             borderWidth: 1,
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
         },
         todayBtnText: {
             fontSize: fontSize.caption + 1,

@@ -118,22 +118,24 @@ export default function TransactionsScreen() {
                             }}
                             hitSlop={6}
                         >
-                            <Ionicons name="calendar-outline" size={16} color={c.primary} />
-                            <Text style={styles.periodText}>{formatPeriod(period)}</Text>
-                            <Ionicons name="chevron-down" size={13} color={c.textMuted} />
+                            <Ionicons name="calendar-outline" size={15} color={c.primary} />
+                            <Text
+                                style={styles.periodText}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.75}
+                            >
+                                {formatPeriod(period)}
+                            </Text>
                         </Pressable>
 
                         <Pressable
                             onPress={goToNextMonth}
                             hitSlop={10}
-                            style={styles.periodArrow}
+                            style={[styles.periodArrow, period >= currentPeriod() && { opacity: 0.4 }]}
                             disabled={period >= currentPeriod()}
                         >
-                            <Ionicons
-                                name="chevron-forward"
-                                size={18}
-                                color={period >= currentPeriod() ? `${c.textMuted}40` : c.text}
-                            />
+                            <Ionicons name="chevron-forward" size={18} color={c.text} />
                         </Pressable>
                     </View>
 
@@ -498,9 +500,11 @@ const createStyles = (c: ReturnType<typeof import("@/theme").useTheme>["colors"]
             gap: spacing.sm,
         },
         periodSelectorContainer: {
+            flex: 1,
             flexDirection: "row",
             alignItems: "center",
             gap: spacing.xs,
+            minWidth: 0,
         },
         periodArrow: {
             padding: spacing.xs,
@@ -508,23 +512,28 @@ const createStyles = (c: ReturnType<typeof import("@/theme").useTheme>["colors"]
             borderRadius: 999,
             borderWidth: 1,
             borderColor: c.border,
+            flexShrink: 0,
         },
         periodPill: {
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: c.surface,
-            paddingHorizontal: spacing.md,
             paddingVertical: spacing.sm,
             borderRadius: 999,
             borderWidth: 1,
             borderColor: c.border,
-            gap: spacing.xs + 2,
+            gap: spacing.xs,
+            flex: 1,
+            justifyContent: "center",
+            paddingHorizontal: spacing.sm,
+            minWidth: 0,
         },
         periodText: {
             fontSize: fontSize.body,
             fontWeight: fontWeight.semibold,
             color: c.text,
             textTransform: "capitalize",
+            flexShrink: 1,
         },
         todayBtn: {
             paddingHorizontal: spacing.md,
@@ -533,6 +542,7 @@ const createStyles = (c: ReturnType<typeof import("@/theme").useTheme>["colors"]
             borderWidth: 1,
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
         },
         todayBtnText: {
             fontSize: fontSize.caption + 1,
